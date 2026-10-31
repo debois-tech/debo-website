@@ -42,11 +42,4 @@ export const COMMUNITIES: Community[] = [
       { label: "Venue", value: "215 CC Lab, MET Institute of Engineering, Nashik" },
     ],
   },
-  {
-    name: "Open Source India",
-    about: "India’s open-source community.",
-    contribution: [],
-    facts: [],
-    pending: true,
-  },
 ];
