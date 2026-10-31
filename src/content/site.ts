@@ -11,6 +11,10 @@ export const SITE = {
   phoneHref: "tel:+918263830296",
   whatsapp: "https://wa.me/918263830296",
   location: "Nashik, Maharashtra, India",
+  /** How quickly we promise to reply to a contact-form enquiry. */
+  responseTime: "1 business day",
+  /** Scheduling link for calls (Cal.com, Calendly, Google Calendar…). Set NEXT_PUBLIC_BOOKING_URL; the Contact page hides the booking block while it is empty. */
+  bookingUrl: process.env.NEXT_PUBLIC_BOOKING_URL ?? "",
   mapsUrl: "https://share.google/5UeHKkNy7OzUZLwmt",
   social: {
     linkedin: "https://www.linkedin.com/company/deboistech",
