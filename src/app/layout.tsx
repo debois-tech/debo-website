@@ -5,7 +5,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollTopOnReload } from "@/components/ScrollTopOnReload";
-import { ChatWidget } from "@/components/chatbot/chat-widget";
 import { SITE } from "@/content/site";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"], display: "swap" });
@@ -38,7 +37,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteHeader />
         <main id="main">{children}</main>
         <SiteFooter />
-        <ChatWidget />
       </body>
     </html>
   );
