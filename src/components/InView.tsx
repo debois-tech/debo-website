@@ -38,3 +38,8 @@ export function InView({
   }, [threshold]);
   return <div ref={ref} className={className}>{children}</div>;
 }
+
+/** Fades and lifts its content in once, when it first scrolls into view. `delay` is in seconds. */
+export function Reveal({ children, className = "", delay = 0, threshold = 0.15 }: { children: ReactNode; className?: string; delay?: number; threshold?: number }) {
+  return <InView threshold={threshold}><div className={`reveal ${className}`} style={{ ["--d" as string]: `${delay}s` }}>{children}</div></InView>;
+}

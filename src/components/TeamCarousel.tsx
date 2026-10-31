@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TEAM, type Member } from "@/content/team";
 
-const INTERVAL = 3500;
+const SPEED = 36; // px per second of continuous drift
 
 /** Reads prefers-reduced-motion without setting state in an effect. Assumes "reduce" on the server so nothing moves before hydration. */
 function useReducedMotion() {
@@ -15,15 +15,14 @@ function useReducedMotion() {
 }
 
 /**
- * Auto-sliding team carousel on native scroll-snap (swipe, trackpad, keyboard-tabbing all work).
- * Autoplay advances one card at a time and loops back to the start. It pauses on hover, on focus inside, while the tab is hidden,
- * and when the carousel is off-screen; there is also a visible pause/play button. Visitors who prefer reduced motion get no autoplay.
+ * Team carousel on a native scroller (swipe, trackpad, keyboard-tabbing all work).
+ * Autoplay drifts continuously and glides back to the start at the end. It pauses on hover, on focus inside, while the tab is hidden,
+ * and when the carousel is off-screen. Visitors who prefer reduced motion get no autoplay.
  */
 export function TeamCarousel({ members = TEAM }: { members?: readonly Member[] }) {
   const track = useRef<HTMLUListElement>(null);
   const reduced = useReducedMotion();
-  const [userPlay, setUserPlay] = useState<boolean | null>(null); // null = follow the motion preference until the visitor chooses
-  const playing = userPlay ?? !reduced;
+  const playing = !reduced;
   const [hold, setHold] = useState(false); // temporary pause (hover / focus)
   const visible = useRef(true);
 
@@ -49,9 +48,22 @@ export function TeamCarousel({ members = TEAM }: { members?: readonly Member[] }
 
   useEffect(() => {
     if (!playing || hold) return;
-    const id = window.setInterval(() => { if (visible.current && !document.hidden) step(1); }, INTERVAL);
-    return () => window.clearInterval(id);
-  }, [playing, hold, step]);
+    const el = track.current; if (!el) return;
+    let raf = 0, last = 0, pos = el.scrollLeft, returning = false;
+    const tick = (t: number) => {
+      const dt = last ? Math.min(t - last, 64) : 0; last = t;
+      if (visible.current && !document.hidden) {
+        if (Math.abs(el.scrollLeft - pos) > 2) pos = el.scrollLeft; // the visitor (or a button) moved it; carry on from there
+        const max = el.scrollWidth - el.clientWidth;
+        if (returning) { if (el.scrollLeft <= 4) { returning = false; pos = el.scrollLeft; } }
+        else if (pos >= max - 1) { returning = true; el.scrollTo({ left: 0, behavior: "smooth" }); }
+        else { pos = Math.min(max, pos + (SPEED * dt) / 1000); el.scrollLeft = pos; }
+      } else last = 0;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, hold]);
 
   const btn = "inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-ink transition-colors hover:border-brand-text hover:text-brand-text";
 
@@ -59,9 +71,9 @@ export function TeamCarousel({ members = TEAM }: { members?: readonly Member[] }
     <div role="group" aria-roledescription="carousel" aria-label="DeboisTech team"
          onPointerEnter={(e) => { if (e.pointerType === "mouse") setHold(true); }} onPointerLeave={() => setHold(false)}
          onFocusCapture={() => setHold(true)} onBlurCapture={() => setHold(false)}>
-      <ul ref={track} className="flex snap-x snap-mandatory gap-6 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul ref={track} className="flex gap-6 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {members.map((m) => (
-          <li key={m.name} className="w-[calc((100%-1.5rem)/2)] shrink-0 snap-start sm:w-[calc((100%-3rem)/3)] lg:w-[calc((100%-4.5rem)/4)]">
+          <li key={m.name} className="w-[calc((100%-1.5rem)/2)] shrink-0 sm:w-[calc((100%-3rem)/3)] lg:w-[calc((100%-4.5rem)/4)]">
             <Image src={m.photo} alt={`Portrait of ${m.name}`} width={320} height={320} className="aspect-square w-full rounded-[var(--radius)] border border-line object-cover" />
             <p className="mt-3 font-bold">{m.name}</p>
             <p className="text-sm text-muted">{m.title}</p>
@@ -74,10 +86,6 @@ export function TeamCarousel({ members = TEAM }: { members?: readonly Member[] }
         ))}
       </ul>
       <div className="mt-4 flex items-center justify-end gap-2">
-        <button type="button" className={`${btn} mr-auto`} aria-pressed={playing} onClick={() => setUserPlay(!playing)}>
-          <span className="sr-only">{playing ? "Pause automatic sliding" : "Play automatic sliding"}</span>
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden fill="currentColor">{playing ? <path d="M4 3h3.5v12H4zM10.5 3H14v12h-3.5z" /> : <path d="M5 3l10 6-10 6z" />}</svg>
-        </button>
         <button type="button" className={btn} onClick={() => step(-1)} aria-label="Previous team members">
           <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4l-6 6 6 6" /></svg>
         </button>

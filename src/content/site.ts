@@ -11,6 +11,7 @@ export const SITE = {
   phoneHref: "tel:+918263830296",
   whatsapp: "https://wa.me/918263830296",
   location: "Nashik, Maharashtra, India",
+  mapsUrl: "https://share.google/5UeHKkNy7OzUZLwmt",
   social: {
     linkedin: "https://www.linkedin.com/company/deboistech",
     github: "https://github.com/debois-tech",

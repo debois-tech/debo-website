@@ -31,7 +31,7 @@ export const PRODUCTS: Product[] = [
     detailHref: "/labs",
     name: "Debo Labs",
     headline: "Learn DevOps by doing.",
-    mark: { src: "/brand/turtle-light.webp", alt: "DeboisTech turtle" },
+    mark: { src: "/brand/debolabs-light.webp", alt: "Debo Labs" },
     highlights: [
       { title: "A real terminal", body: "A genuine Linux shell, as its own user. Break things safely." },
       { title: "Graded on real state", body: "The check inspects your sandbox, however you reached the result." },
@@ -159,4 +159,4 @@ export const getProduct = (slug: string) => PRODUCTS.find((p) => p.slug === slug
 export const productHref = (p: Product) => p.detailHref ?? `/products/${p.slug}`;
 
 /** Logo box for each product mark, so images keep their true proportions. */
-export const markSize = (p: Product) => (p.slug === "motoadmin" ? { w: 160, h: 40 } : p.slug === "debo-labs" ? { w: 67, h: 40 } : { w: 40, h: 40 });
+export const markSize = (p: Product) => (p.slug === "motoadmin" ? { w: 160, h: 40 } : p.slug === "debo-labs" ? { w: 160, h: 40 } : { w: 40, h: 40 });

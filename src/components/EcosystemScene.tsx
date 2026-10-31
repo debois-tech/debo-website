@@ -37,10 +37,10 @@ export function EcosystemScene() {
       </div>
 
       <ul className="divide-y divide-line border-y border-line">
-        {NODES.map((n) => {
+        {NODES.map((n, i) => {
           const on = n.id === active;
           return (
-            <li key={n.id}>
+            <li key={n.id} className="reveal" style={{ ["--d" as string]: `${0.15 + i * 0.15}s` }}>
               <button type="button" aria-expanded={on} onClick={() => choose(n.id)}
                 className="flex min-h-20 w-full items-center justify-between gap-4 py-6 text-left">
                 <span className={`display text-3xl transition-colors sm:text-5xl ${on ? "text-ink" : "text-muted hover:text-ink"}`}>{n.label}</span>

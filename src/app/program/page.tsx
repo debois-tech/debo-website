@@ -2,7 +2,6 @@ import Image from "next/image";
 import { PixelEdge } from "@/components/PixelEdge";
 import Link from "next/link";
 import { ButtonLink, PageHero, Section, SectionHeader } from "@/components/ui";
-import { FinalInvitation } from "@/components/FinalInvitation";
 import { TRACKS, TEP_INTRO } from "@/content/tep";
 import { LABS } from "@/content/labs";
 import type { DbProgram, WithId } from "@/content/dynamic";
@@ -94,7 +93,6 @@ export default async function ProgramPage() {
           <ButtonLink href={LABS.startUrl} variant="secondary">Start the first lab</ButtonLink>
         </div>
       </Section>
-      <FinalInvitation />
     </>
   );
 }

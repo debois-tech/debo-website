@@ -1,5 +1,5 @@
 import { DB_URL } from "./firebase-config";
-import type { DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
+import type { DbOpening, DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
 import type { Member } from "@/content/team";
 
 /** Public reads from the Realtime Database REST API. Any failure returns null so pages fall back to built-in content. */
@@ -31,3 +31,8 @@ export async function getPosts(): Promise<WithId<DbPost>[]> {
   return list(await read<Record<string, DbPost>>("posts")).filter((p) => p.slug && p.title).sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0));
 }
 export async function getPost(slug: string) { return (await getPosts()).find((p) => p.slug === slug) ?? null; }
+
+/** Open roles managed from the dashboard. Closed roles are hidden from the public page. */
+export async function getOpenings(): Promise<WithId<DbOpening>[]> {
+  return list(await read<Record<string, DbOpening>>("openings")).filter((o) => o.title && o.slug && o.open).sort(byOrder);
+}

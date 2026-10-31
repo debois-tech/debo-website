@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "./ui";
 import { ScrollVar } from "./ScrollVar";
@@ -28,9 +29,9 @@ export function Hero() {
       <div aria-hidden className="pixel-grid absolute inset-0 -z-10 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_25%,black,transparent_70%)]" />
       <CursorBlock />
 
-      <div className="container-x relative z-10 flex flex-col items-center pt-5 text-center sm:pt-8 lg:pt-6">
+      <div className="container-x relative z-10 flex flex-col items-center pt-12 text-center sm:pt-16 lg:pt-24">
         <Link href="/labs" className="hero-in group inline-flex min-h-10 items-center gap-2 rounded-full border border-line-strong/70 bg-[#111] py-1.5 pl-3 pr-4 text-[13px] text-muted transition-colors hover:border-glow hover:text-ink" style={{ ["--d" as string]: "0s" }}>
-          <span className="size-1.5 bg-glow" aria-hidden />
+          <Image src="/brand/debolabs-icon.webp" alt="" width={16} height={17} className="h-4 w-auto" aria-hidden />
           <span><span className="font-semibold text-ink">Debo Labs</span> · practice DevOps in a real terminal</span>
         </Link>
 
