@@ -12,6 +12,7 @@ import { AboutScene } from "@/components/AboutScene";
 import { ButtonLink, Section, SectionHeader } from "@/components/ui";
 import { PRODUCTS } from "@/content/products";
 import { SITE } from "@/content/site";
+import { Reveal } from "@/components/InView";
 import { getTeam } from "@/lib/content";
 import { TEP_INTRO } from "@/content/tep";
 
@@ -47,21 +48,21 @@ export default async function HomePage() {
       <PixelEdge from="#ffffff" to="var(--paper)" />
       <Section theme="light" labelledBy="products">
         <SectionHeader id="products" title="Three products, built in-house." lead="Open one to see how it works, then go deeper on its own page." />
-        <ProductCarousel label="DeboisTech products" slides={PRODUCTS.map((p) => ({ id: p.slug, label: p.name, node: <ProductSlide product={p} /> }))} />
+        <Reveal><ProductCarousel label="DeboisTech products" slides={PRODUCTS.map((p) => ({ id: p.slug, label: p.name, node: <ProductSlide product={p} /> }))} /></Reveal>
       </Section>
 
       <PixelEdge from="var(--paper)" to="#ffffff" />
       <Section theme="white" labelledBy="services">
         <SectionHeader id="services" title="What we engineer." lead="Seven capability areas. Pick one to see who it’s for and what an engagement delivers." />
-        <ServicesExplorer />
+        <Reveal><ServicesExplorer /></Reveal>
       </Section>
 
       <PixelEdge from="#ffffff" to="var(--paper)" />
       <Section theme="light" labelledBy="team">
         <SectionHeader id="team" title="Meet the team." lead={`${SITE.legalName} works from ${SITE.location}, with clients across India and internationally, remotely.`} />
-        <TeamCarousel members={team ?? undefined} />
+        <Reveal><TeamCarousel members={team ?? undefined} /></Reveal>
         <CultureGallery />
-        <div className="mt-10"><ButtonLink href="/company" variant="secondary">About the company</ButtonLink></div>
+        <Reveal className="mt-10"><ButtonLink href="/company" variant="secondary">About the company</ButtonLink></Reveal>
       </Section>
 
       <PixelEdge from="var(--paper)" to="#ffffff" />
