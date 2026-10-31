@@ -6,4 +6,8 @@ export type DbProgram = {
   startDate?: string; endDate?: string; duration?: string; fee?: string; applyUrl?: string; imageId?: string; order?: number; updatedAt?: number;
 };
 export type DbPost = { title: string; slug: string; excerpt: string; body: string; author?: string; tags?: string[]; coverImageId?: string; publishedAt?: number; updatedAt?: number };
+export type DbOpening = {
+  title: string; slug: string; location: string; type: string; summary?: string;
+  responsibilities?: string[]; requirements?: string[]; applyUrl?: string; open: boolean; order?: number; updatedAt?: number;
+};
 export type WithId<T> = T & { id: string };

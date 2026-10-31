@@ -38,7 +38,7 @@ export function SiteFooter() {
               <ul>
                 <li><a href={`mailto:${SITE.email}`} className={linkClass}>{SITE.email}</a></li>
                 <li><a href={SITE.phoneHref} className={linkClass}>{SITE.phone}</a></li>
-                <li><span className="inline-block py-2 text-[15px] text-muted">{SITE.location}</span></li>
+                <li><a href={SITE.mapsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>{SITE.location}<span className="sr-only"> (view on Google Maps, opens in a new tab)</span></a></li>
                 <li><a href={SITE.social.linkedin} target="_blank" rel="noopener noreferrer" className={linkClass}>LinkedIn<span className="sr-only"> (opens in a new tab)</span></a></li>
                 <li><a href={SITE.social.github} target="_blank" rel="noopener noreferrer" className={linkClass}>GitHub<span className="sr-only"> (opens in a new tab)</span></a></li>
                 <li><a href={SITE.social.instagram} target="_blank" rel="noopener noreferrer" className={linkClass}>Instagram<span className="sr-only"> (opens in a new tab)</span></a></li>

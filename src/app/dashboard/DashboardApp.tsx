@@ -5,7 +5,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } fr
 import { get, onValue, push, ref, remove, serverTimestamp, set, update } from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 import { base64ToObjectUrl, imageSrc, prepareImage } from "@/lib/images";
-import type { DbPost, DbProgram, DbTeam, ProgramStatus, WithId } from "@/content/dynamic";
+import type { DbOpening, DbPost, DbProgram, DbTeam, ProgramStatus, WithId } from "@/content/dynamic";
 import { TEAM } from "@/content/team";
 import { TEP_INTRO } from "@/content/tep";
 
@@ -303,6 +303,80 @@ function BlogTab() {
   );
 }
 
+/* ---------- careers ---------- */
+const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
+
+function OpeningForm({ initial, openings, onDone }: { initial?: WithId<DbOpening>; openings: WithId<DbOpening>[]; onDone: () => void }) {
+  const [v, setV] = useState({ title: initial?.title ?? "", slug: initial?.slug ?? "", location: initial?.location ?? "Nashik", type: initial?.type ?? "Full-time", summary: initial?.summary ?? "",
+    responsibilities: (initial?.responsibilities ?? []).join("\n"), requirements: (initial?.requirements ?? []).join("\n"), applyUrl: initial?.applyUrl ?? "", open: initial?.open ?? true });
+  const [slugTouched, setSlugTouched] = useState(!!initial);
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setErr("");
+    const slug = slugify(v.slug || v.title);
+    if (!v.title.trim() || !v.location.trim() || !v.type.trim()) return setErr("Title, location and type are required.");
+    if (!slug) return setErr("Add a title or slug.");
+    if (openings.some((o) => o.id !== initial?.id && o.slug === slug)) return setErr(`Another role already uses the slug "${slug}". Change it.`);
+    if (v.applyUrl && !isUrl(v.applyUrl.trim()) && !/^mailto:[^\s@]+@[^\s@]+$/.test(v.applyUrl.trim())) return setErr("The apply link must start with http://, https:// or mailto:");
+    setBusy(true);
+    try {
+      const id = initial?.id ?? push(ref(database(), "openings")).key!;
+      const resp = lines(v.responsibilities), reqs = lines(v.requirements);
+      const rec: DbOpening = { title: v.title.trim(), slug, location: v.location.trim(), type: v.type.trim(), open: v.open, order: initial?.order ?? openings.length, updatedAt: Date.now(),
+        ...(v.summary.trim() ? { summary: v.summary.trim() } : {}), ...(resp.length ? { responsibilities: resp } : {}), ...(reqs.length ? { requirements: reqs } : {}), ...(v.applyUrl.trim() ? { applyUrl: v.applyUrl.trim() } : {}) };
+      await set(ref(database(), `openings/${id}`), rec); onDone();
+    } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={save} className="space-y-5 rounded-xl border border-line p-5">
+      <h3 className="text-xl font-bold">{initial ? "Edit role" : "Add role"}</h3>
+      <Field label="Job title *"><input className={input} value={v.title} required onChange={(e) => setV((p) => ({ ...p, title: e.target.value, slug: slugTouched ? p.slug : slugify(e.target.value) }))} /></Field>
+      <div className="grid gap-5 sm:grid-cols-3">
+        <Field label="Location *"><input className={input} value={v.location} onChange={(e) => setV((p) => ({ ...p, location: e.target.value }))} required /></Field>
+        <Field label="Type *"><input className={input} value={v.type} onChange={(e) => setV((p) => ({ ...p, type: e.target.value }))} placeholder="Full-time, Internship…" required /></Field>
+        <Field label="Slug" hint="Used to track applications."><input className={input} value={v.slug} onChange={(e) => { setSlugTouched(true); setV((p) => ({ ...p, slug: e.target.value })); }} /></Field>
+      </div>
+      <Field label="Summary" hint="One or two sentences about the role."><textarea className={input} rows={3} value={v.summary} onChange={(e) => setV((p) => ({ ...p, summary: e.target.value }))} /></Field>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Responsibilities" hint="One per line."><textarea className={input} rows={6} value={v.responsibilities} onChange={(e) => setV((p) => ({ ...p, responsibilities: e.target.value }))} /></Field>
+        <Field label="Requirements" hint="One per line."><textarea className={input} rows={6} value={v.requirements} onChange={(e) => setV((p) => ({ ...p, requirements: e.target.value }))} /></Field>
+      </div>
+      <Field label="Apply link" hint="Optional. Blank sends applicants to the Contact form (Careers)."><input className={input} value={v.applyUrl} onChange={(e) => setV((p) => ({ ...p, applyUrl: e.target.value }))} placeholder="https://… or mailto:careers@…" /></Field>
+      <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.open} onChange={(e) => setV((p) => ({ ...p, open: e.target.checked }))} /> Open (shown on the Careers page). Untick once the role is filled.</label>
+      {err && <p role="alert" className="text-sm text-error">{err}</p>}
+      <div className="flex gap-3"><button className={btnPrimary} disabled={busy}>{busy ? "Saving…" : "Save role"}</button><button type="button" className={btnGhost} onClick={onDone}>Cancel</button></div>
+    </form>
+  );
+}
+
+function CareersTab() {
+  const { rows, error } = useList<DbOpening>("openings", true);
+  const [editing, setEditing] = useState<WithId<DbOpening> | "new" | null>(null);
+  const all = useMemo(() => (rows ?? []).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [rows]);
+  const move = async (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= all.length) return; const order = all.map((o) => o.id); [order[i], order[j]] = [order[j], order[i]]; const u: Record<string, number> = {}; order.forEach((id, k) => { u[`openings/${id}/order`] = k; }); await update(ref(database()), u); };
+  const toggle = async (o: WithId<DbOpening>) => { await update(ref(database()), { [`openings/${o.id}/open`]: !o.open, [`openings/${o.id}/updatedAt`]: serverTimestamp() }); };
+  const del = async (o: WithId<DbOpening>) => { if (!window.confirm(`Delete "${o.title}"? This cannot be undone.`)) return; await remove(ref(database(), `openings/${o.id}`)); };
+  if (editing) return <OpeningForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} openings={all} onDone={() => setEditing(null)} />;
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between"><p className="text-muted">Open roles appear at /careers. With none open, the page invites people to get in touch.</p><button className={btnPrimary} onClick={() => setEditing("new")}>Add role</button></div>
+      {error && <p role="alert" className="text-error">{error}</p>}
+      {rows === null && !error && <p className="text-muted">Loading…</p>}
+      {rows && rows.length === 0 && <p className="rounded-xl border border-dashed border-line-strong p-6 text-muted">No roles yet. The Careers page currently shows “No current openings”.</p>}
+      <ul className="divide-y divide-line rounded-xl border border-line">
+        {all.map((o, i) => (
+          <li key={o.id} className="flex flex-wrap items-center gap-4 p-4">
+            <div className="mr-auto min-w-0"><p className="font-semibold">{o.title}<span className={`ml-2 rounded-full border px-2 py-0.5 text-xs ${o.open ? "border-brand-text text-brand-text" : "border-line-strong text-muted"}`}>{o.open ? "Open" : "Closed"}</span></p><p className="truncate text-sm text-muted">{o.location} · {o.type}</p></div>
+            <button className={btnGhost} onClick={() => void move(i, -1)} disabled={i === 0} aria-label={`Move ${o.title} up`}>↑</button>
+            <button className={btnGhost} onClick={() => void move(i, 1)} disabled={i === all.length - 1} aria-label={`Move ${o.title} down`}>↓</button>
+            <button className={btnGhost} onClick={() => void toggle(o)}>{o.open ? "Close" : "Reopen"}</button>
+            <button className={btnGhost} onClick={() => setEditing(o)}>Edit</button><button className={btnDanger} onClick={() => void del(o)}>Delete</button>
+          </li>))}
+      </ul>
+    </div>
+  );
+}
+
 /* ---------- setup ---------- */
 function SetupTab({ user }: { user: User }) {
   const [msg, setMsg] = useState(""); const [busy, setBusy] = useState(false);
@@ -343,7 +417,7 @@ function SetupTab({ user }: { user: User }) {
 }
 
 /* ---------- shell ---------- */
-const TABS = ["Programs", "Team", "Blog", "Setup"] as const;
+const TABS = ["Programs", "Team", "Blog", "Careers", "Setup"] as const;
 type Tab = (typeof TABS)[number];
 
 export function DashboardApp() {
@@ -385,7 +459,7 @@ export function DashboardApp() {
         </div></nav>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8" role="tabpanel" aria-label={tab}>
-        {tab === "Programs" && <ProgramsTab />}{tab === "Team" && <TeamTab />}{tab === "Blog" && <BlogTab />}{tab === "Setup" && <SetupTab user={user} />}
+        {tab === "Programs" && <ProgramsTab />}{tab === "Team" && <TeamTab />}{tab === "Blog" && <BlogTab />}{tab === "Careers" && <CareersTab />}{tab === "Setup" && <SetupTab user={user} />}
       </main>
     </div>
   );

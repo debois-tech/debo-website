@@ -25,6 +25,7 @@ const nextConfig: NextConfig = {
     ];
   },
   turbopack: {
+    root: __dirname, // pin the project root; a stray package-lock.json sits in the parent folder
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],
