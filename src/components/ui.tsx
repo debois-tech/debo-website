@@ -33,7 +33,7 @@ export function ButtonLink({
 export function Section({
   id, theme = "light", children, className = "", labelledBy,
 }: { id?: string; theme?: "light" | "mint" | "dark" | "white"; children: ReactNode; className?: string; labelledBy?: string }) {
-  const bg = theme === "dark" ? "bg-forest text-ink on-dark" : theme === "mint" ? "bg-wash text-ink" : theme === "white" ? "light-surface" : "bg-paper text-ink";
+  const bg = theme === "dark" ? "bg-paper text-ink on-dark" : theme === "mint" ? "bg-paper text-ink" : theme === "white" ? "light-surface" : "bg-paper text-ink";
   return (
     <section id={id} aria-labelledby={labelledBy} className={`${bg} py-14 sm:py-28 ${className}`}>
       <div className="container-x">{children}</div>

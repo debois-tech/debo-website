@@ -34,7 +34,7 @@ export default async function TrackPage({ params }: PageProps<"/tep/[track]">) {
           <div><h2 className="text-2xl font-extrabold">What you’ll cover</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-muted">{t.topics.map((x) => <li key={x}>{x}</li>)}</ul></div>
         </div>
       </Section>
-      <PixelEdge from="#ffffff" to="var(--wash)" />
+      <PixelEdge from="#ffffff" to="var(--paper)" />
       <Section theme="mint" labelledBy="cohort">
         <SectionHeader id="cohort" title="Current cohort details" lead={cohort.length ? "Details for the current Technology Excellence Program cohort:" : "We don’t publish dates or fees on this page because they change by cohort. Ask us and we’ll confirm:"} />
         {cohort.length > 0 ? (
@@ -44,6 +44,7 @@ export default async function TrackPage({ params }: PageProps<"/tep/[track]">) {
         )}
         <ButtonLink href={flagship?.applyUrl ?? `/contact?intent=tep&track=${t.slug}`}>{flagship?.applyUrl ? "Apply" : "Ask about the current cohort"}</ButtonLink>
       </Section>
+      <PixelEdge from="var(--paper)" to="#ffffff" />
     </>
   );
 }

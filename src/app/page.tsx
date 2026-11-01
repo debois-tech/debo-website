@@ -13,6 +13,7 @@ import { ButtonLink, Section, SectionHeader } from "@/components/ui";
 import { PRODUCTS } from "@/content/products";
 import { SITE } from "@/content/site";
 import { Reveal } from "@/components/InView";
+import { NewsletterSection } from "@/components/NewsletterSection";
 import { getTeam } from "@/lib/content";
 import { TEP_INTRO } from "@/content/tep";
 
@@ -70,6 +71,10 @@ export default async function HomePage() {
         <SectionHeader id="tep" title="Learn by building." lead={TEP_INTRO} />
         <TepJourney />
       </Section>
+
+      <PixelEdge from="#ffffff" to="var(--paper)" />
+      <NewsletterSection />
+      <PixelEdge from="var(--paper)" to="#ffffff" />
 
     </>
   );

@@ -28,13 +28,12 @@ export default function LabsPage() {
         </ol>
       </Section>
 
-      <PixelEdge from="#ffffff" to="var(--wash)" />
+      <PixelEdge from="#ffffff" to="var(--paper)" />
       <Section theme="mint" labelledBy="tracks-h" id="tracks">
         <SectionHeader id="tracks-h" title="Pick a track." lead={`${LAB_TOTALS.labs} labs across ${LAB_TOTALS.tracks} tracks, about ${LAB_TOTALS.minutes.toLocaleString("en-IN")} minutes in total. One square is one lab.`} />
         <LabTracks />
       </Section>
 
-      <PixelEdge from="var(--wash)" to="var(--forest)" />
       <Section theme="dark" labelledBy="local">
         <SectionHeader id="local" dark title="On your own machine." lead="Docker is all you need." />
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
@@ -54,6 +53,7 @@ export default function LabsPage() {
         </div>
         <p className="mt-8 text-sm text-muted">A DeboisTech project. Information from labs.deboistech.in, last reviewed {LABS.lastReviewed}.</p>
       </Section>
+      <PixelEdge from="var(--paper)" to="#ffffff" />
     </>
   );
 }

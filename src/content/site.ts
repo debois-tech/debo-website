@@ -11,6 +11,12 @@ export const SITE = {
   phoneHref: "tel:+918263830296",
   whatsapp: "https://wa.me/918263830296",
   location: "Nashik, Maharashtra, India",
+  /** How quickly we promise to reply to a contact-form enquiry. */
+  responseTime: "1 business day",
+  /** Scheduling link for calls (Cal.com, Calendly, Google Calendar…). Set NEXT_PUBLIC_BOOKING_URL; the Contact page hides the booking block while it is empty. */
+  bookingUrl: process.env.NEXT_PUBLIC_BOOKING_URL ?? "",
+  /** Current office, in full. Shown on Contact and in the footer; `location` stays the short form for running text. */
+  addressLines: ["Shop No. 40, DeboisTech", "Roongta Mall, Uttam Nagar, Cidco", "Nashik - 422010"],
   mapsUrl: "https://share.google/5UeHKkNy7OzUZLwmt",
   social: {
     linkedin: "https://www.linkedin.com/company/deboistech",
@@ -23,14 +29,14 @@ export const NAV = [
   { label: "Home", href: "/" },
   { label: "Products", href: "/products" },
   { label: "Services", href: "/services" },
-  { label: "About", href: "/company" },
   { label: "Program", href: "/program" },
+  { label: "Company", href: "/company" },
   { label: "Contact", href: "/contact" },
 ] as const;
 
 export const FOOTER_LINKS = {
   About: [
-    { label: "About", href: "/company" },
+    { label: "Company", href: "/company" },
     { label: "Work", href: "/work" },
     { label: "Blog", href: "/blog" },
     { label: "Careers", href: "/careers" },

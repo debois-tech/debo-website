@@ -1,10 +1,12 @@
 import { ButtonLink } from "@/components/ui";
+import { PixelEdge } from "@/components/PixelEdge";
 
 export const metadata = { title: "Page not found", robots: { index: false } };
 
 export default function NotFound() {
   return (
-    <div className="bg-forest text-ondark on-dark pixel-grid">
+    <>
+    <div className="bg-paper text-ondark on-dark pixel-grid">
       <div className="container-x py-24">
         <p className="font-mono text-sm text-glow">404</p>
         <h1 className="mt-2 text-4xl font-extrabold">This page wandered off.</h1>
@@ -17,5 +19,7 @@ export default function NotFound() {
         </div>
       </div>
     </div>
+    <PixelEdge from="var(--paper)" to="#ffffff" />
+    </>
   );
 }

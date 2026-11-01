@@ -35,7 +35,7 @@ export default async function ServicePage({ params }: PageProps<"/services/[serv
           </div>
         </div>
       </Section>
-      <PixelEdge from="#ffffff" to="var(--wash)" />
+      <PixelEdge from="#ffffff" to="var(--paper)" />
       <Section theme="mint" labelledBy="next-h">
         <SectionHeader id="next-h" title={`Talk to us about ${s.name}.`} lead="Tell us what you’re building or what isn’t working. We’ll reply with the right next step." />
         <div className="flex flex-wrap gap-3">
@@ -43,6 +43,7 @@ export default async function ServicePage({ params }: PageProps<"/services/[serv
           <ButtonLink href="/services" variant="secondary">All services</ButtonLink>
         </div>
       </Section>
+      <PixelEdge from="var(--paper)" to="#ffffff" />
     </>
   );
 }

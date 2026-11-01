@@ -11,7 +11,7 @@ const COLUMNS: { title: string; items: Item[] }[] = [
   { title: "Products", items: [...PRODUCTS.map((p) => ({ label: p.name, href: productHref(p) })), { label: "All products", href: "/products" }] },
   { title: "Services", items: SERVICES.map((s) => ({ label: s.name, href: `/services/${s.slug}` })) },
   { title: "Program", items: [{ label: "All programs", href: "/program" }, { label: "Technology Excellence Program", href: "/tep" }, ...TRACKS.map((t) => ({ label: t.name, href: `/tep/${t.slug}` }))] },
-  { title: "About", items: [{ label: "About", href: "/company" }, { label: "Work", href: "/work" }, { label: "Blog", href: "/blog" }, { label: "Careers", href: "/careers" }, { label: "Contact", href: "/contact" }] },
+  { title: "Company", items: [{ label: "Company", href: "/company" }, { label: "Work", href: "/work" }, { label: "Blog", href: "/blog" }, { label: "Careers", href: "/careers" }, { label: "Contact", href: "/contact" }] },
 ];
 
 const linkClass = "inline-block py-2 text-[15px] text-muted transition-colors hover:text-ink";

@@ -189,7 +189,7 @@ test("hero fits a 1366×768 laptop: headline, buttons and the skyline are on the
   await ctx.close();
 });
 
-test("home sections alternate black and white: the black hero and About form one block, then white, black, white; the last section and footer are white", async ({ page }) => {
+test("home sections alternate black and white: the black hero and About form one block, then white, black, white; the newsletter closes the page in black, then the white footer", async ({ page }) => {
   await page.goto("/");
   const tones = await page.evaluate(() => {
     const lum = (rgb: string) => { const m = rgb.match(/\d+(\.\d+)?/g)!.map(Number); return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; };
@@ -205,7 +205,8 @@ test("home sections alternate black and white: the black hero and About form one
   expect(tones[1].tone).toBe("black");
   const main = tones.slice(1, -1);
   for (let i = 1; i < main.length; i++) expect(main[i].tone, `${main[i - 1].name} → ${main[i].name}`).not.toBe(main[i - 1].tone);
-  expect(main.at(-1)!.tone).toBe("white");   // the last section (TEP) is white and runs straight into the white footer
+  expect(main.at(-1)!.tone).toBe("black");   // the newsletter section closes the page, then a pixel edge into the white footer
+  expect(main.at(-2)!.tone).toBe("white");   // TEP
   expect(tones.at(-1)!.tone).toBe("white");
 });
 
@@ -237,19 +238,20 @@ test("pixel edges never leave a seam before the next section, at fractional brow
   }
 });
 
-test("About page has a community section covering GDG Nashik, CNCF Nashik and Open Source India", async ({ page }) => {
+test("Company page has a community section covering GDG Nashik and CNCG Nashik", async ({ page }) => {
   await page.goto("/company");
   const sec = page.locator("section[aria-labelledby='community']");
-  await expect(sec.getByRole("heading", { level: 2, name: "Our community work." })).toBeVisible();
-  for (const n of ["Google Developer Groups Nashik", "CNCF Nashik", "Open Source India"]) await expect(sec.getByRole("heading", { level: 3, name: n })).toBeVisible();
-  await expect(sec.getByText("18 February 2026")).toBeVisible();
+  await expect(sec.getByRole("heading", { level: 2, name: "We build more than software. We build ecosystems." })).toBeVisible();
+  await expect(sec.getByRole("heading", { level: 3, name: "From Prompt to Prod" })).toBeVisible();
+  await expect(sec.getByText("Cloud Native & AI: from Kubernetes to Intelligent Systems").first()).toBeVisible();
+  await expect(sec.getByText("215 CC Lab, MET Institute of Engineering, Nashik")).toBeVisible();
 });
 
 test("navbar: Program replaces Academy / TEP, Debo Labs is gone, and the CTA is compact", async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Primary" });
-  expect(await nav.getByRole("link").allTextContents()).toEqual(["Home", "Products", "Services", "About", "Program"]);
+  expect(await nav.getByRole("link").allTextContents()).toEqual(["Home", "Products", "Services", "Program", "Company"]);
   await expect(page.getByRole("link", { name: "Let’s build together" }).first()).toBeVisible();
   const cta = (await page.locator("header a[href='/contact']").first().boundingBox())!;
   const pill = (await page.locator("header .glass-pill").boundingBox())!;
