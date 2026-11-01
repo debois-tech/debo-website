@@ -5,7 +5,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } fr
 import { get, onValue, push, ref, remove, serverTimestamp, set, update } from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 import { base64ToObjectUrl, imageSrc, prepareImage } from "@/lib/images";
-import type { DbOpening, DbPost, DbProgram, DbTeam, ProgramStatus, WithId } from "@/content/dynamic";
+import type { AchievementLabel, DbAchievement, DbJourney, DbMentor, DbOpening, DbPost, DbProgram, DbProject, DbTeam, DbTestimonial, ProgramStatus, WithId } from "@/content/dynamic";
 import { TEAM } from "@/content/team";
 import { TEP_INTRO } from "@/content/tep";
 
@@ -377,6 +377,262 @@ function CareersTab() {
   );
 }
 
+/* ---------- testimonials ---------- */
+function TestimonialForm({ initial, all, onDone }: { initial?: WithId<DbTestimonial>; all: WithId<DbTestimonial>[]; onDone: () => void }) {
+  const slot = useImageSlot(initial?.imageId);
+  const [v, setV] = useState({ quote: initial?.quote ?? "", name: initial?.name ?? "", role: initial?.role ?? "", company: initial?.company ?? "", program: initial?.program ?? "", linkedin: initial?.linkedin ?? "", videoUrl: initial?.videoUrl ?? "",
+    kind: (initial?.kind ?? "client") as "client" | "learner", featured: initial?.featured ?? false, published: initial?.published ?? true });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setErr("");
+    if (!v.quote.trim() || !v.name.trim()) return setErr("The quote and the name are required.");
+    for (const [label, url] of [["LinkedIn", v.linkedin], ["Video", v.videoUrl]] as const) if (url.trim() && !isUrl(url.trim())) return setErr(`The ${label} link must start with http:// or https://`);
+    setBusy(true);
+    try {
+      const id = initial?.id ?? push(ref(database(), "testimonials")).key!;
+      const rec: DbTestimonial = { quote: v.quote.replace(/\r\n/g, "\n").trim(), name: v.name.trim(), published: v.published, kind: v.kind, order: initial?.order ?? all.length, updatedAt: Date.now(),
+        ...(v.role.trim() ? { role: v.role.trim() } : {}), ...(v.company.trim() ? { company: v.company.trim() } : {}), ...(v.program.trim() ? { program: v.program.trim() } : {}),
+        ...(v.linkedin.trim() ? { linkedin: v.linkedin.trim() } : {}), ...(v.videoUrl.trim() ? { videoUrl: v.videoUrl.trim() } : {}), ...(slot.id ? { imageId: slot.id } : {}), ...(v.featured ? { featured: true } : {}) };
+      await set(ref(database(), `testimonials/${id}`), rec); await slot.commit(); onDone();
+    } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
+  };
+  const t = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  return (
+    <form onSubmit={save} className="space-y-5 rounded-xl border border-line p-5">
+      <h3 className="text-xl font-bold">{initial ? "Edit testimonial" : "Add testimonial"}</h3>
+      <Field label="Shown on"><select className={input} value={v.kind} onChange={(e) => setV((p) => ({ ...p, kind: e.target.value as "client" | "learner" }))}><option value="client">Services page: client voice</option><option value="learner">TEP page: learner voice</option></select></Field>
+      <Field label="Quote *" hint="What they said, without quotation marks."><textarea className={input} rows={5} value={v.quote} onChange={t("quote")} required /></Field>
+      <div className="grid gap-5 sm:grid-cols-3">
+        <Field label="Name *"><input className={input} value={v.name} onChange={t("name")} required /></Field>
+        <Field label={v.kind === "learner" ? "Role or course" : "Role"}><input className={input} value={v.role} onChange={t("role")} placeholder={v.kind === "learner" ? "e.g. B.E. student" : "e.g. Founder"} /></Field>
+        <Field label={v.kind === "learner" ? "College or organisation" : "Company"}><input className={input} value={v.company} onChange={t("company")} /></Field>
+      </div>
+      {v.kind === "learner" && (
+        <>
+          <Field label="Program or workshop attended" hint="e.g. TEP, AI / ML Engineering"><input className={input} value={v.program} onChange={t("program")} /></Field>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="LinkedIn profile"><input className={input} type="url" value={v.linkedin} onChange={t("linkedin")} placeholder="https://www.linkedin.com/in/…" /></Field>
+            <Field label="Video testimonial link"><input className={input} type="url" value={v.videoUrl} onChange={t("videoUrl")} placeholder="https://…" /></Field>
+          </div>
+          <ImageField slot={slot} label="Photo" />
+          <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.featured} onChange={(e) => setV((p) => ({ ...p, featured: e.target.checked }))} /> Featured (shown large at the top)</label>
+        </>
+      )}
+      <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published. Only publish words, names and photos you have permission to use.</label>
+      {err && <p role="alert" className="text-sm text-error">{err}</p>}
+      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save testimonial"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+    </form>
+  );
+}
+
+/** Shared list tab for content that is ordered, can be hidden, and may own an image: testimonials, achievements and projects. */
+function ManagedTab<T extends { published: boolean; order?: number; imageId?: string }>({ path, intro, addLabel, emptyText, label, sub, Form }: {
+  path: string; intro: string; addLabel: string; emptyText: string; label: (r: WithId<T>) => string; sub: (r: WithId<T>) => string;
+  Form: (p: { initial?: WithId<T>; all: WithId<T>[]; onDone: () => void }) => ReactNode;
+}) {
+  const { rows, error } = useList<T>(path, true);
+  const [editing, setEditing] = useState<WithId<T> | "new" | null>(null);
+  const all = useMemo(() => (rows ?? []).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [rows]);
+  const move = async (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= all.length) return; const order = all.map((x) => x.id); [order[i], order[j]] = [order[j], order[i]]; const u: Record<string, number> = {}; order.forEach((id, k) => { u[`${path}/${id}/order`] = k; }); await update(ref(database()), u); };
+  const toggle = async (r: WithId<T>) => { await update(ref(database()), { [`${path}/${r.id}/published`]: !r.published, [`${path}/${r.id}/updatedAt`]: serverTimestamp() }); };
+  const del = async (r: WithId<T>) => { if (!window.confirm(`Delete "${label(r)}"? This cannot be undone.`)) return; await remove(ref(database(), `${path}/${r.id}`)); if (r.imageId) await remove(ref(database(), `images/${r.imageId}`)).catch(() => {}); };
+  if (editing) return <>{Form({ initial: editing === "new" ? undefined : editing, all, onDone: () => setEditing(null) })}</>;
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4"><p className="text-muted">{intro}</p><button className={btnPrimary} onClick={() => setEditing("new")}>{addLabel}</button></div>
+      {error && <p role="alert" className="text-error">{error}</p>}
+      {rows === null && !error && <p className="text-muted">Loading…</p>}
+      {rows && rows.length === 0 && <p className="rounded-xl border border-dashed border-line-strong p-6 text-muted">{emptyText}</p>}
+      <ul className="divide-y divide-line rounded-xl border border-line">
+        {all.map((r, i) => (
+          <li key={r.id} className="flex flex-wrap items-center gap-4 p-4">
+            {r.imageId ? <img src={imageSrc(r.imageId)} alt="" className="size-12 rounded-md object-cover" /> : null}
+            <div className="mr-auto min-w-0"><p className="font-semibold">{label(r)}<span className={`ml-2 rounded-full border px-2 py-0.5 text-xs ${r.published ? "border-brand-text text-brand-text" : "border-line-strong text-muted"}`}>{r.published ? "Published" : "Hidden"}</span></p><p className="truncate text-sm text-muted">{sub(r)}</p></div>
+            <button className={btnGhost} onClick={() => void move(i, -1)} disabled={i === 0} aria-label={`Move ${label(r)} up`}>↑</button>
+            <button className={btnGhost} onClick={() => void move(i, 1)} disabled={i === all.length - 1} aria-label={`Move ${label(r)} down`}>↓</button>
+            <button className={btnGhost} onClick={() => void toggle(r)}>{r.published ? "Hide" : "Publish"}</button>
+            <button className={btnGhost} onClick={() => setEditing(r)}>Edit</button><button className={btnDanger} onClick={() => void del(r)}>Delete</button>
+          </li>))}
+      </ul>
+    </div>
+  );
+}
+
+const TestimonialsTab = () => <ManagedTab<DbTestimonial> path="testimonials" intro="Client voices appear on the Services page, learner voices on the TEP page. With none published, those sections are hidden." addLabel="Add testimonial" emptyText="No testimonials yet."
+  label={(t) => t.name} sub={(t) => `${t.kind === "learner" ? "Learner · TEP page" : "Client · Services page"} · ${t.quote}`} Form={(p) => <TestimonialForm key={p.initial?.id ?? "new"} {...p} />} />;
+
+/* ---------- achievements ---------- */
+const ACH_LABEL: Record<AchievementLabel, string> = { placed: "Placed", internship: "Internship", certified: "Certified", progress: "Career progress" };
+function AchievementForm({ initial, all, onDone }: { initial?: WithId<DbAchievement>; all: WithId<DbAchievement>[]; onDone: () => void }) {
+  const slot = useImageSlot(initial?.imageId);
+  const [v, setV] = useState({ name: initial?.name ?? "", title: initial?.title ?? "", org: initial?.org ?? "", label: (initial?.label ?? "progress") as AchievementLabel, track: initial?.track ?? "", date: initial?.date ?? "", linkedin: initial?.linkedin ?? "", story: initial?.story ?? "", published: initial?.published ?? false });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const t = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setErr("");
+    if (!v.name.trim() || !v.title.trim()) return setErr("The learner’s name and the achievement are required.");
+    if (v.linkedin.trim() && !isUrl(v.linkedin.trim())) return setErr("The link must start with http:// or https://");
+    setBusy(true);
+    try {
+      const id = initial?.id ?? push(ref(database(), "achievements")).key!;
+      const rec: DbAchievement = { name: v.name.trim(), title: v.title.trim(), label: v.label, published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(),
+        ...(v.org.trim() ? { org: v.org.trim() } : {}), ...(v.track ? { track: v.track } : {}), ...(v.date.trim() ? { date: v.date.trim() } : {}), ...(v.linkedin.trim() ? { linkedin: v.linkedin.trim() } : {}), ...(v.story.trim() ? { story: v.story.trim() } : {}), ...(slot.id ? { imageId: slot.id } : {}) };
+      await set(ref(database(), `achievements/${id}`), rec); await slot.commit(); onDone();
+    } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={save} className="space-y-5 rounded-xl border border-line p-5">
+      <h3 className="text-xl font-bold">{initial ? "Edit achievement" : "Add achievement"}</h3>
+      <p className="text-sm text-muted">Add only what the learner has agreed to share and what a public link (such as their LinkedIn post) can verify. Never imply a company is a hiring partner or that TEP caused the outcome.</p>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Learner name *"><input className={input} value={v.name} onChange={t("name")} required /></Field>
+        <Field label="Type *"><select className={input} value={v.label} onChange={(e) => setV((p) => ({ ...p, label: e.target.value as AchievementLabel }))}>{(Object.keys(ACH_LABEL) as AchievementLabel[]).map((k) => <option key={k} value={k}>{ACH_LABEL[k]}</option>)}</select></Field>
+        <Field label="Job title or achievement *"><input className={input} value={v.title} onChange={t("title")} required /></Field>
+        <Field label="Organisation"><input className={input} value={v.org} onChange={t("org")} /></Field>
+        <Field label="Related track"><select className={input} value={v.track} onChange={t("track")}><option value="">Not specified</option><option value="ai-ml">AI / ML Engineering</option><option value="multi-cloud">Multi-Cloud Engineering</option></select></Field>
+        <Field label="Date" hint="e.g. October 2026"><input className={input} value={v.date} onChange={t("date")} /></Field>
+      </div>
+      <Field label="LinkedIn announcement or verification link"><input className={input} type="url" value={v.linkedin} onChange={t("linkedin")} placeholder="https://…" /></Field>
+      <Field label="Their story (optional)" hint="Their own words or a short factual summary."><textarea className={input} rows={4} value={v.story} onChange={t("story")} /></Field>
+      <ImageField slot={slot} label="Photo (with permission)" />
+      <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page). Untick to keep as a draft.</label>
+      {err && <p role="alert" className="text-sm text-error">{err}</p>}
+      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save achievement"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+    </form>
+  );
+}
+const AchievementsTab = () => <ManagedTab<DbAchievement> path="achievements" intro="Verified learner milestones for the TEP page. With none published, the section is hidden. Publish only with each learner’s permission." addLabel="Add achievement" emptyText="No achievements yet."
+  label={(a) => a.name} sub={(a) => `${ACH_LABEL[a.label]} · ${a.title}${a.org ? ` · ${a.org}` : ""}`} Form={(p) => <AchievementForm key={p.initial?.id ?? "new"} {...p} />} />;
+
+/* ---------- projects ---------- */
+const lines2 = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
+function ProjectForm({ initial, all, onDone }: { initial?: WithId<DbProject>; all: WithId<DbProject>[]; onDone: () => void }) {
+  const slot = useImageSlot(initial?.imageId);
+  const [v, setV] = useState({ title: initial?.title ?? "", kind: (initial?.kind ?? "capstone") as DbProject["kind"], track: initial?.track ?? "", problem: initial?.problem ?? "", description: initial?.description ?? "", contributors: initial?.contributors ?? "",
+    stack: (initial?.stack ?? []).join(", "), deliverables: (initial?.deliverables ?? []).join("\n"), repo: initial?.repo ?? "", demo: initial?.demo ?? "", feedback: initial?.feedback ?? "", published: initial?.published ?? false });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const t = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setErr("");
+    if (!v.title.trim() || !v.description.trim()) return setErr("The title and the description are required.");
+    for (const [label, url] of [["GitHub", v.repo], ["Live demo", v.demo]] as const) if (url.trim() && !isUrl(url.trim())) return setErr(`The ${label} link must start with http:// or https://`);
+    setBusy(true);
+    try {
+      const id = initial?.id ?? push(ref(database(), "projects")).key!;
+      const stack = v.stack.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 14), deliverables = lines2(v.deliverables);
+      const rec: DbProject = { title: v.title.trim(), kind: v.kind, description: v.description.trim(), published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(),
+        ...(v.track ? { track: v.track } : {}), ...(v.problem.trim() ? { problem: v.problem.trim() } : {}), ...(v.contributors.trim() ? { contributors: v.contributors.trim() } : {}), ...(stack.length ? { stack } : {}), ...(deliverables.length ? { deliverables } : {}),
+        ...(v.repo.trim() ? { repo: v.repo.trim() } : {}), ...(v.demo.trim() ? { demo: v.demo.trim() } : {}), ...(v.feedback.trim() ? { feedback: v.feedback.trim() } : {}), ...(slot.id ? { imageId: slot.id } : {}) };
+      await set(ref(database(), `projects/${id}`), rec); await slot.commit(); onDone();
+    } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={save} className="space-y-5 rounded-xl border border-line p-5">
+      <h3 className="text-xl font-bold">{initial ? "Edit project" : "Add project"}</h3>
+      <p className="text-sm text-muted">List only projects that have actually been built. Learner projects need the learners’ permission.</p>
+      <div className="grid gap-5 sm:grid-cols-3">
+        <Field label="Type *"><select className={input} value={v.kind} onChange={(e) => setV((p) => ({ ...p, kind: e.target.value as DbProject["kind"] }))}><option value="capstone">Capstone (What you’ll build)</option><option value="learner">Learner project (Built by our learners)</option></select></Field>
+        <Field label="Track"><select className={input} value={v.track} onChange={t("track")}><option value="">Not specified</option><option value="ai-ml">AI / ML Engineering</option><option value="multi-cloud">Multi-Cloud Engineering</option></select></Field>
+        <Field label="Contributors"><input className={input} value={v.contributors} onChange={t("contributors")} placeholder="Names, comma separated" /></Field>
+      </div>
+      <Field label="Title *"><input className={input} value={v.title} onChange={t("title")} required /></Field>
+      <Field label="Problem being solved"><textarea className={input} rows={2} value={v.problem} onChange={t("problem")} /></Field>
+      <Field label="Description *"><textarea className={input} rows={4} value={v.description} onChange={t("description")} required /></Field>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Technology stack" hint="Comma separated."><input className={input} value={v.stack} onChange={t("stack")} /></Field>
+        <Field label="Deliverables" hint="One per line."><textarea className={input} rows={3} value={v.deliverables} onChange={t("deliverables")} /></Field>
+        <Field label="GitHub repository"><input className={input} type="url" value={v.repo} onChange={t("repo")} placeholder="https://github.com/…" /></Field>
+        <Field label="Live demo"><input className={input} type="url" value={v.demo} onChange={t("demo")} placeholder="https://…" /></Field>
+      </div>
+      <Field label="Mentor or evaluator feedback (optional)"><textarea className={input} rows={2} value={v.feedback} onChange={t("feedback")} /></Field>
+      <ImageField slot={slot} label="Screenshot or architecture diagram" />
+      <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page). Untick to keep as a draft.</label>
+      {err && <p role="alert" className="text-sm text-error">{err}</p>}
+      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save project"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+    </form>
+  );
+}
+const ProjectsTab = () => <ManagedTab<DbProject> path="projects" intro="Capstones and learner projects for the TEP page. Each section is hidden until it has a published project." addLabel="Add project" emptyText="No projects yet."
+  label={(p) => p.title} sub={(p) => `${p.kind === "capstone" ? "Capstone" : "Learner project"}${p.contributors ? ` · ${p.contributors}` : ""}`} Form={(p) => <ProjectForm key={p.initial?.id ?? "new"} {...p} />} />;
+
+/* ---------- mentors ---------- */
+const csv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 12);
+function MentorForm({ initial, all, onDone }: { initial?: WithId<DbMentor>; all: WithId<DbMentor>[]; onDone: () => void }) {
+  const slot = useImageSlot(initial?.imageId);
+  const [v, setV] = useState({ name: initial?.name ?? "", title: initial?.title ?? "", linkedin: initial?.linkedin ?? "", expertise: (initial?.expertise ?? []).join(", "), guides: (initial?.guides ?? []).join(", "), published: initial?.published ?? true });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const t = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setErr("");
+    if (!v.name.trim() || !v.title.trim()) return setErr("Name and role are required.");
+    if (v.linkedin.trim() && !isUrl(v.linkedin.trim())) return setErr("The LinkedIn link must start with http:// or https://");
+    if (!slot.id) return setErr("Add a photo.");
+    setBusy(true);
+    try {
+      const id = initial?.id ?? push(ref(database(), "mentors")).key!;
+      const ex = csv(v.expertise), gu = csv(v.guides);
+      const rec: DbMentor = { name: v.name.trim(), title: v.title.trim(), imageId: slot.id, published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(),
+        ...(v.linkedin.trim() ? { linkedin: v.linkedin.trim() } : {}), ...(ex.length ? { expertise: ex } : {}), ...(gu.length ? { guides: gu } : {}) };
+      await set(ref(database(), `mentors/${id}`), rec); await slot.commit(); onDone();
+    } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={save} className="space-y-5 rounded-xl border border-line p-5">
+      <h3 className="text-xl font-bold">{initial ? "Edit mentor" : "Add mentor"}</h3>
+      <p className="text-sm text-muted">Only people who actually mentor on the program. Do not add qualifications or past employers you cannot verify.</p>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Full name *"><input className={input} value={v.name} onChange={t("name")} required /></Field>
+        <Field label="Role *"><input className={input} value={v.title} onChange={t("title")} placeholder="e.g. DevOps Engineer" required /></Field>
+      </div>
+      <Field label="LinkedIn profile"><input className={input} type="url" value={v.linkedin} onChange={t("linkedin")} placeholder="https://www.linkedin.com/in/…" /></Field>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Technical expertise" hint="Comma separated."><input className={input} value={v.expertise} onChange={t("expertise")} placeholder="Kubernetes, CI/CD" /></Field>
+        <Field label="Modules or areas they guide" hint="Comma separated."><input className={input} value={v.guides} onChange={t("guides")} placeholder="Containers and Kubernetes" /></Field>
+      </div>
+      <ImageField slot={slot} label="Photo *" />
+      <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page)</label>
+      {err && <p role="alert" className="text-sm text-error">{err}</p>}
+      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save mentor"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+    </form>
+  );
+}
+const MentorsTab = () => <ManagedTab<DbMentor> path="mentors" intro="Mentors shown on the TEP page, in this order. With none published, the section is hidden." addLabel="Add mentor" emptyText="No mentors yet."
+  label={(m) => m.name} sub={(m) => `${m.title}${m.guides?.length ? ` · guides ${m.guides.join(", ")}` : ""}`} Form={(p) => <MentorForm key={p.initial?.id ?? "new"} {...p} />} />;
+
+/* ---------- learner journeys ---------- */
+function JourneyForm({ initial, all, onDone }: { initial?: WithId<DbJourney>; all: WithId<DbJourney>[]; onDone: () => void }) {
+  const [v, setV] = useState({ before: initial?.before ?? "", after: initial?.after ?? "", who: initial?.who ?? "", track: initial?.track ?? "", published: initial?.published ?? false });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const t = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setErr("");
+    if (!v.before.trim() || !v.after.trim()) return setErr("Both “where they started” and “what they built” are required.");
+    setBusy(true);
+    try {
+      const id = initial?.id ?? push(ref(database(), "journeys")).key!;
+      const rec: DbJourney = { before: v.before.trim(), after: v.after.trim(), published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(), ...(v.who.trim() ? { who: v.who.trim() } : {}), ...(v.track ? { track: v.track } : {}) };
+      await set(ref(database(), `journeys/${id}`), rec); onDone();
+    } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={save} className="space-y-5 rounded-xl border border-line p-5">
+      <h3 className="text-xl font-bold">{initial ? "Edit journey" : "Add journey"}</h3>
+      <p className="text-sm text-muted">A real learner’s progress, shared with their permission. Not a promise of results for everyone.</p>
+      <Field label="Where they started *" hint="e.g. Basic Python knowledge"><input className={input} value={v.before} onChange={t("before")} required /></Field>
+      <Field label="What they built or became *" hint="e.g. Built and deployed an AI application"><input className={input} value={v.after} onChange={t("after")} required /></Field>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Learner (optional)" hint="Name or first name, with permission."><input className={input} value={v.who} onChange={t("who")} /></Field>
+        <Field label="Track"><select className={input} value={v.track} onChange={t("track")}><option value="">Not specified</option><option value="AI / ML Engineering">AI / ML Engineering</option><option value="Multi-Cloud Engineering">Multi-Cloud Engineering</option></select></Field>
+      </div>
+      <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page). Untick to keep as a draft.</label>
+      {err && <p role="alert" className="text-sm text-error">{err}</p>}
+      <div className="flex gap-3"><button className={btnPrimary} disabled={busy}>{busy ? "Saving…" : "Save journey"}</button><button type="button" className={btnGhost} onClick={onDone}>Cancel</button></div>
+    </form>
+  );
+}
+const JourneysTab = () => <ManagedTab<DbJourney> path="journeys" intro="Before-and-after learner stories for “Progress you can see” on the TEP page. Hidden until one is published."  addLabel="Add journey" emptyText="No journeys yet."
+  label={(j) => j.who || j.after} sub={(j) => `${j.before} → ${j.after}`} Form={(p) => <JourneyForm key={p.initial?.id ?? "new"} {...p} />} />;
+
 /* ---------- setup ---------- */
 function SetupTab({ user }: { user: User }) {
   const [msg, setMsg] = useState(""); const [busy, setBusy] = useState(false);
@@ -417,7 +673,7 @@ function SetupTab({ user }: { user: User }) {
 }
 
 /* ---------- shell ---------- */
-const TABS = ["Programs", "Team", "Blog", "Careers", "Setup"] as const;
+const TABS = ["Programs", "Team", "Blog", "Careers", "Testimonials", "Mentors", "Achievements", "Projects", "Journeys", "Setup"] as const;
 type Tab = (typeof TABS)[number];
 
 export function DashboardApp() {
@@ -459,7 +715,7 @@ export function DashboardApp() {
         </div></nav>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8" role="tabpanel" aria-label={tab}>
-        {tab === "Programs" && <ProgramsTab />}{tab === "Team" && <TeamTab />}{tab === "Blog" && <BlogTab />}{tab === "Careers" && <CareersTab />}{tab === "Setup" && <SetupTab user={user} />}
+        {tab === "Programs" && <ProgramsTab />}{tab === "Team" && <TeamTab />}{tab === "Blog" && <BlogTab />}{tab === "Careers" && <CareersTab />}{tab === "Testimonials" && <TestimonialsTab />}{tab === "Mentors" && <MentorsTab />}{tab === "Achievements" && <AchievementsTab />}{tab === "Journeys" && <JourneysTab />}{tab === "Projects" && <ProjectsTab />}{tab === "Setup" && <SetupTab user={user} />}
       </main>
     </div>
   );

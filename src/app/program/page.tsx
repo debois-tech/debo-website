@@ -78,7 +78,7 @@ export default async function ProgramPage() {
         </article>
       </Section>
 
-      <PixelEdge from="#ffffff" to="var(--wash)" />
+      <PixelEdge from="#ffffff" to="var(--paper)" />
       {sections.filter(([, , rows]) => rows.length).map(([eyebrow, title, rows], i) => (
         <Section key={title} theme={i % 2 ? "light" : "mint"} labelledBy={`p-${i}`}>
           <SectionHeader id={`p-${i}`} eyebrow={eyebrow} title={title} />
@@ -93,6 +93,7 @@ export default async function ProgramPage() {
           <ButtonLink href={LABS.startUrl} variant="secondary">Start the first lab</ButtonLink>
         </div>
       </Section>
+      <PixelEdge from="var(--paper)" to="#ffffff" />
     </>
   );
 }

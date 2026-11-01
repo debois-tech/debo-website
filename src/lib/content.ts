@@ -1,5 +1,5 @@
 import { DB_URL } from "./firebase-config";
-import type { DbOpening, DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
+import type { DbAchievement, DbJourney, DbMentor, DbOpening, DbProject, DbTestimonial, DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
 import type { Member } from "@/content/team";
 
 /** Public reads from the Realtime Database REST API. Any failure returns null so pages fall back to built-in content. */
@@ -35,4 +35,22 @@ export async function getPost(slug: string) { return (await getPosts()).find((p)
 /** Open roles managed from the dashboard. Closed roles are hidden from the public page. */
 export async function getOpenings(): Promise<WithId<DbOpening>[]> {
   return list(await read<Record<string, DbOpening>>("openings")).filter((o) => o.title && o.slug && o.open).sort(byOrder);
+}
+
+/** Testimonials managed from the dashboard. Unpublished ones are hidden; `kind` picks client voices (Services) or learner voices (TEP). */
+export async function getTestimonials(kind: "client" | "learner" = "client"): Promise<WithId<DbTestimonial>[]> {
+  return list(await read<Record<string, DbTestimonial>>("testimonials")).filter((t) => t.quote && t.name && t.published && (t.kind ?? "client") === kind).sort(byOrder);
+}
+export async function getAchievements(): Promise<WithId<DbAchievement>[]> {
+  return list(await read<Record<string, DbAchievement>>("achievements")).filter((a) => a.name && a.title && a.published).sort(byOrder);
+}
+export async function getProjects(kind: DbProject["kind"]): Promise<WithId<DbProject>[]> {
+  return list(await read<Record<string, DbProject>>("projects")).filter((p) => p.title && p.description && p.published && p.kind === kind).sort(byOrder);
+}
+
+export async function getMentors(): Promise<WithId<DbMentor>[]> {
+  return list(await read<Record<string, DbMentor>>("mentors")).filter((m) => m.name && m.title && m.published).sort(byOrder);
+}
+export async function getJourneys(): Promise<WithId<DbJourney>[]> {
+  return list(await read<Record<string, DbJourney>>("journeys")).filter((j) => j.before && j.after && j.published).sort(byOrder);
 }

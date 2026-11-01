@@ -4,12 +4,17 @@ import { JOURNEY, TRACKS } from "@/content/tep";
 import { track } from "@/lib/analytics";
 import { ButtonLink } from "./ui";
 
-/** Accessible tabs: arrow keys move between tracks; the panel is the learning roadmap. */
+/**
+ * Track selector (accessible tabs, arrow keys) and the learning roadmap for the chosen track.
+ * Each stage opens to show what you practise, the tools or concepts it names, and the deliverable where the program has one.
+ */
 export function TepJourney() {
   const [i, setI] = useState(0);
+  const [open, setOpen] = useState<number | null>(0);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const t = TRACKS[i];
-  const select = (n: number) => { setI(n); track("tep_track_select", { track_id: TRACKS[n].slug }); };
+  const stages = JOURNEY[t.slug];
+  const select = (n: number) => { setI(n); setOpen(0); track("tep_track_select", { track_id: TRACKS[n].slug }); };
   const onKey = (e: KeyboardEvent, n: number) => {
     const next = e.key === "ArrowRight" ? (n + 1) % TRACKS.length : e.key === "ArrowLeft" ? (n - 1 + TRACKS.length) % TRACKS.length : null;
     if (next === null) return;
@@ -37,16 +42,32 @@ export function TepJourney() {
           </div>
           <p className="mt-4 text-sm text-muted">Dates, fees and availability change by cohort. We confirm them when you enquire.</p>
         </div>
-        <ol className="relative border-l-2 border-line pl-8">
-          {JOURNEY[t.slug].map((s, n) => (
-            <li key={s.step} className="relative pb-8 last:pb-0">
-              <span aria-hidden className="absolute -left-[41px] top-1.5 size-4 bg-brand-logo" />
-              <p className="text-sm text-muted">Stage {n + 1}</p>
-              <h3 className="text-xl font-bold">{s.step}</h3>
-              <p className="mt-1 text-muted">{s.body}</p>
-            </li>
-          ))}
-        </ol>
+        <div>
+          <ol className="relative border-l-2 border-line pl-8">
+            {stages.map((s, n) => {
+              const on = open === n, id = `${t.slug}-stage-${n}`;
+              return (
+                <li key={s.step} className="relative pb-3 last:pb-0">
+                  <span aria-hidden className={`absolute -left-[41px] top-4 size-4 transition-colors ${on ? "bg-glow" : "bg-brand-logo"}`} />
+                  <button type="button" aria-expanded={on} aria-controls={id} onClick={() => setOpen(on ? null : n)}
+                    className="group flex min-h-14 w-full items-start justify-between gap-4 rounded-[var(--radius)] py-2.5 text-left">
+                    <span>
+                      <span className="block text-sm text-muted">Stage {n + 1}</span>
+                      <span className="block text-xl font-bold transition-colors group-hover:text-brand-text">{s.step}</span>
+                      <span className="mt-1 block text-muted">{s.body}</span>
+                    </span>
+                    <span aria-hidden className={`mt-5 shrink-0 text-2xl leading-none text-brand-text transition-transform duration-300 ${on ? "rotate-45" : ""}`}>+</span>
+                  </button>
+                  <div id={id} hidden={!on} className="svc-panel-in mb-3 space-y-4 border-t border-line pb-2 pt-4 text-[15px]">
+                    <div><p className="font-semibold">What you’ll practise</p><ul className="mt-1.5 space-y-1.5">{s.learn.map((l) => <li key={l} className="flex gap-2.5 text-muted"><span aria-hidden className="mt-2 size-1.5 shrink-0 bg-brand-logo" />{l}</li>)}</ul></div>
+                    {s.tools && <div><p className="font-semibold">Tools and concepts</p><ul className="mt-1.5 flex flex-wrap gap-2">{s.tools.map((x) => <li key={x} className="rounded-full border border-line-strong px-3 py-0.5 text-sm">{x}</li>)}</ul></div>}
+                    {s.deliverable && <div><p className="font-semibold">Deliverable</p><p className="mt-1 text-muted">{s.deliverable}</p></div>}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       </div>
     </div>
   );
