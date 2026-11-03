@@ -22,27 +22,28 @@ export function TepJourney() {
   };
   return (
     <div>
-      <div role="tablist" aria-label="Program tracks" className="flex flex-wrap gap-2">
+      <div role="tablist" aria-label="Program tracks" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {TRACKS.map((tr, n) => (
           <button key={tr.slug} ref={(el) => { refs.current[n] = el; }} role="tab" id={`tab-${tr.slug}`} aria-selected={n === i} aria-controls={`panel-${tr.slug}`}
             tabIndex={n === i ? 0 : -1} onClick={() => select(n)} onKeyDown={(e) => onKey(e, n)}
-            className={`min-h-12 rounded-full border px-5 py-2 text-base font-semibold transition-colors ${n === i ? "border-glow bg-glow text-forest" : "border-line-strong text-ink hover:border-glow"}`}>
+            className={`min-h-12 rounded-full border px-3 py-2 text-center text-sm font-semibold leading-tight transition-colors sm:px-5 sm:text-base ${n === i ? "border-glow bg-glow text-forest" : "border-line-strong text-ink hover:border-glow"}`}>
             {tr.name}
           </button>
         ))}
       </div>
-      <div role="tabpanel" id={`panel-${t.slug}`} aria-labelledby={`tab-${t.slug}`} tabIndex={0} className="mt-10 grid grid-cols-1 gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
-        <div>
-          <p className="text-xl leading-relaxed text-muted">{t.summary}</p>
+      <div role="tabpanel" id={`panel-${t.slug}`} aria-labelledby={`tab-${t.slug}`} tabIndex={0} className="mt-8 grid grid-cols-1 gap-10 lg:mt-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          <p className="text-lg leading-relaxed text-muted sm:text-xl">{t.summary}</p>
           <p className="mt-6 text-muted"><span className="font-semibold text-ink">Who it’s for. </span>{t.audience}</p>
           <p className="mt-4 text-muted"><span className="font-semibold text-ink">Format. </span>{t.format.map((f, k) => (k ? f.toLowerCase() : f)).join(", ")}.</p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <ButtonLink href={`/tep/${t.slug}`} variant="secondary" event="tep_track_select" eventProps={{ track_id: t.slug, cta_id: "details" }}>Track details</ButtonLink>
             <ButtonLink href={`/contact?intent=tep&track=${t.slug}`} event="tep_track_select" eventProps={{ track_id: t.slug, cta_id: "enquire" }}>Enquire or apply</ButtonLink>
           </div>
           <p className="mt-4 text-sm text-muted">Dates, fees and availability change by cohort. We confirm them when you enquire.</p>
         </div>
         <div>
+          <p className="mb-4 text-sm font-semibold text-brand-text">Your path · {stages.length} stages, ending with {stages[stages.length - 1].step.toLowerCase()}</p>
           <ol className="relative border-l-2 border-line pl-8">
             {stages.map((s, n) => {
               const on = open === n, id = `${t.slug}-stage-${n}`;
