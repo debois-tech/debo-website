@@ -375,3 +375,9 @@ main > section, main > .hero { position: relative; z-index: 1; }
   .stack-rise { transform-origin: bottom; animation: stack-rise 0.55s var(--ease, ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
 }
 @keyframes stack-rise { from { transform: scaleY(0.15); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+
+/* ---------- skeleton loaders: a quiet shimmer; still (no movement) with reduced motion ---------- */
+.skeleton { background: linear-gradient(100deg, var(--sk-a, #222) 30%, var(--sk-b, #303030) 50%, var(--sk-a, #222) 70%); background-size: 220% 100%; border-radius: 0.5rem; }
+.light-surface .skeleton { --sk-a: #ececec; --sk-b: #f7f7f7; }
+@media (prefers-reduced-motion: no-preference) { .skeleton { animation: skeleton-sweep 1.4s ease-in-out infinite; } }
+@keyframes skeleton-sweep { from { background-position: 120% 0; } to { background-position: -120% 0; } }

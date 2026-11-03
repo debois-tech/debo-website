@@ -93,7 +93,7 @@ export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (key) {
     try {
-      const { text, ctx } = await runModel(contents, key, process.env.CHATBOT_MODEL || "gemini-2.5-flash", chunks);
+      const { text, ctx } = await runModel(contents, key, process.env.CHATBOT_MODEL || "gemini-3.5-flash", chunks);
       const action: ChatAction | undefined = ctx.actions[ctx.actions.length - 1];
       return json({ ok: true, text: clip(text, 4000), action, submitted: ctx.submitted });
     } catch (err) {

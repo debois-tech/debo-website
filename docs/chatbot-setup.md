@@ -4,7 +4,7 @@
 Copy the Debo section of `.env.example` into `.env.local`. All variables are server-only.
 
 - `GEMINI_API_KEY`: from Google AI Studio. Without it Debo answers from the offline knowledge base.
-- `CHATBOT_MODEL`: Gemini model id (default `gemini-2.5-flash`).
+- `CHATBOT_MODEL`: Gemini model id (default `gemini-3.5-flash`; `gemini-2.5-flash` is no longer available to new API keys).
 - `LEAD_WEBHOOK_URL`: optional. When empty, enquiries are emailed through FormSubmit to adityabankar@deboistech.in and harshadgangurde@deboistech.in (override with `ENQUIRY_NOTIFY_EMAILS`, comma separated; the first address is the main recipient, the rest are CC). FormSubmit asks the inbox owner to confirm the address once, on the first submission.
 
 ## Google Sheets storage

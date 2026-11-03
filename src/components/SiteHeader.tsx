@@ -71,8 +71,8 @@ export function SiteHeader() {
     <header data-tone="dark" data-scrolled="false" className="glass-host pointer-events-none sticky top-0 z-50 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5">
       <div ref={pillRef} className="glass-pill pointer-events-auto relative mx-auto flex items-center justify-between gap-4 rounded-full pl-5 pr-2">
         <Link href="/" aria-label="DeboisTech — home" className="inline-grid min-h-11 shrink-0 place-items-center">
-          <Image src="/brand/logo-horizontal-dark.webp" alt="DeboisTech" width={3064} height={630} priority className="glass-logo-dark col-start-1 row-start-1 h-7 w-auto" />
-          <Image src="/brand/logo-horizontal-light.webp" alt="" aria-hidden width={3064} height={630} className="glass-logo-light col-start-1 row-start-1 h-7 w-auto" />
+          <Image src="/brand/logo-horizontal-dark.webp" alt="DeboisTech" width={3064} height={630} sizes="140px" priority className="glass-logo-dark col-start-1 row-start-1 h-7 w-auto" />
+          <Image src="/brand/logo-horizontal-light.webp" alt="" aria-hidden width={3064} height={630} sizes="140px" className="glass-logo-light col-start-1 row-start-1 h-7 w-auto" />
         </Link>
 
         <nav aria-label="Primary" className="hidden items-center gap-0.5 lg:flex">

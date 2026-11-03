@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   completeSubmission, handleInput, inFlow, initialState, placeholderFor, reprompt, welcome,
@@ -13,9 +12,8 @@ type Msg = BotMessage & { id: string; role: "bot" | "user"; at: number };
 type Saved = { id: string; savedAt: number; messages: Msg[]; state: FlowState };
 
 const KEY = "debo-chat-v1";
-const NUDGE_KEY = "debo-chat-nudged";
 const TTL = 24 * 60 * 60 * 1000;
-const LOGO = "/brand/debo-icon.png";
+const LOGO = "/brand/debo-assistant.png";
 const MOBILE = "(max-width: 639px)";
 const NEAR_BOTTOM = 120;
 
@@ -72,7 +70,6 @@ const pill = "rounded-full border px-4 py-2 text-sm font-semibold leading-snug t
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [nudge, setNudge] = useState(false);
-  const onHome = usePathname() === "/";
   const [online, setOnline] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [flow, setFlow] = useState<FlowState>(initialState);
@@ -101,10 +98,8 @@ export function ChatWidget() {
     setFlow(s?.state ?? initialState());
     setConvId(s?.id ?? uid());
     /* eslint-enable react-hooks/set-state-in-effect */
-    let seen = false;
-    try { seen = !!sessionStorage.getItem(NUDGE_KEY); } catch { /* ignore */ }
-    if (seen) return;
-    const t = setTimeout(() => setNudge(true), 4000);
+    // Debo greets on every fresh page load (a refresh or a new visit), not once per session.
+    const t = setTimeout(() => setNudge(true), 1800);
     return () => clearTimeout(t);
   }, []);
 
@@ -184,10 +179,7 @@ export function ChatWidget() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, confirmReset]);
 
-  const dismissNudge = () => {
-    setNudge(false);
-    try { sessionStorage.setItem(NUDGE_KEY, "1"); } catch { /* ignore */ }
-  };
+  const dismissNudge = () => setNudge(false);
   const openChat = () => { dismissNudge(); setOpen(true); };
   const closeChat = () => { setConfirmReset(false); setOpen(false); };
 
@@ -346,7 +338,7 @@ export function ChatWidget() {
                       </dl>
                     )}
                     {m.after && <p className="mt-3">{m.after}</p>}
-                    {m.sticker && <Image src="/brand/debo-mascot.png" alt="" width={96} height={56} className="mt-2" />}
+                    {m.sticker && <Image src="/brand/debo-assistant-sticker.png" alt="" width={96} height={56} className="mt-2" />}
                   </div>
                   {m.action && safeHref(m.action.href) && (
                     <a href={m.action.href} target={external(m.action.href) ? "_blank" : undefined} rel="noopener noreferrer" className="mt-2 inline-flex min-h-11 items-center rounded-full bg-[var(--d-brand)] px-5 text-sm font-semibold text-black shadow-[0_8px_24px_-10px_rgba(76,175,104,.7)] transition-colors duration-150 hover:bg-[var(--d-brand-hi)]">{m.action.label}</a>
@@ -412,9 +404,9 @@ export function ChatWidget() {
         </section>
       )}
 
-      {!open && nudge && onHome && (
+      {!open && nudge && (
         <div className="debo-nudge fixed bottom-[5.5rem] right-4 z-50 flex max-w-[16rem] items-start gap-1 rounded-2xl border border-[var(--d-border)] bg-[var(--d-raised)] py-2 pl-4 pr-2 text-sm text-[var(--d-text)] shadow-[0_16px_48px_-12px_rgba(0,0,0,.8)] sm:bottom-28 sm:right-6">
-          <button type="button" onClick={openChat} className="py-1 text-left leading-snug">Hey, Debo here! How may I help you?</button>
+          <button type="button" onClick={openChat} className="py-1 text-left leading-snug">Hi, I’m Debo! How can I assist you today?</button>
           <button type="button" onClick={dismissNudge} aria-label="Dismiss" className="debo-icon shrink-0 text-xl leading-none">×</button>
         </div>
       )}
