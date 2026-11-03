@@ -5,6 +5,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollTopOnReload } from "@/components/ScrollTopOnReload";
+import { ChatWidget } from "@/components/chatbot/chat-widget";
+import { HideOnDashboard } from "@/components/HideOnDashboard";
 import { SITE } from "@/content/site";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"], display: "swap" });
@@ -32,11 +34,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <noscript><style>{`.reveal{opacity:1!important;transform:none!important}.draw{stroke-dashoffset:0!important}.arrive{transform:none!important}`}</style></noscript>
         <a href="#main" className="skip-link">Skip to content</a>
-        <ScrollProgress />
+        <HideOnDashboard><ScrollProgress /></HideOnDashboard>
         <ScrollTopOnReload />
-        <SiteHeader />
+        <HideOnDashboard><SiteHeader /></HideOnDashboard>
         <main id="main">{children}</main>
-        <SiteFooter />
+        <HideOnDashboard><SiteFooter /></HideOnDashboard>
+        <HideOnDashboard><ChatWidget /></HideOnDashboard>
       </body>
     </html>
   );

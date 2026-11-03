@@ -5,9 +5,14 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } fr
 import { get, onValue, push, ref, remove, serverTimestamp, set, update } from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 import { base64ToObjectUrl, imageSrc, prepareImage } from "@/lib/images";
-import type { AchievementLabel, DbAchievement, DbJourney, DbMentor, DbOpening, DbPost, DbProgram, DbProject, DbTeam, DbTestimonial, ProgramStatus, WithId } from "@/content/dynamic";
+import { programTiming } from "@/lib/program-status";
+import type { DbCommunityPhoto, AchievementLabel, DbAchievement, DbJourney, DbMentor, DbOpening, DbPost, DbProgram, DbProject, DbTeam, DbTepSections, DbTestimonial, ProgramStatus, TepSectionKey, WithId } from "@/content/dynamic";
 import { TEAM } from "@/content/team";
-import { TEP_INTRO } from "@/content/tep";
+import { JOURNEY, TEP_INTRO, TOOLKIT } from "@/content/tep";
+import { ChipPicker } from "./ChipPicker";
+import { ALL_SECTIONS, SECTIONS, Shell, ListSkeleton, askConfirm, notify } from "./shell";
+
+type TabProps = { startNew?: boolean };
 
 /* ---------- small helpers ---------- */
 const input = "mt-1 block min-h-11 w-full rounded-md border border-line-strong bg-wash px-3 py-2 text-ink placeholder:text-muted/70";
@@ -65,19 +70,21 @@ type Slot = ReturnType<typeof useImageSlot>;
 
 function ImageField({ slot, label }: { slot: Slot; label: string }) {
   const src = slot.local || imageSrc(slot.id);
+  const [over, setOver] = useState(false);
+  const take = (f?: File | null) => { if (f) void slot.upload(f); };
   return (
     <div>
       <p className="text-sm font-semibold">{label}</p>
-      <div className="mt-1 flex flex-wrap items-center gap-4">
-        {src ? <img src={src} alt="" className="size-24 rounded-md border border-line object-cover" /> : <div className="grid size-24 place-items-center rounded-md border border-dashed border-line-strong text-xs text-muted">No image</div>}
-        <div className="space-y-2">
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" disabled={slot.busy} aria-label={`${label}: choose a file`}
-                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void slot.upload(f); e.target.value = ""; }} className="block text-sm file:mr-3 file:rounded-full file:border-0 file:bg-glow file:px-4 file:py-2 file:font-semibold file:text-forest" />
-          {slot.id && <button type="button" className="text-sm text-brand-text underline" onClick={slot.clear}>Remove image</button>}
-          <p className="text-xs text-muted">The original file is stored exactly as uploaded (lossless). JPG, PNG, WebP, GIF or AVIF, up to 7.5 MB.</p>
-        </div>
-      </div>
-      {slot.busy && <p role="status" className="mt-2 text-sm text-muted">Uploading…</p>}
+      <label onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files?.[0]); }}
+        className={`mt-1 flex cursor-pointer flex-wrap items-center gap-4 rounded-xl border-2 border-dashed p-4 transition-colors focus-within:border-glow ${over ? "border-glow bg-glow/10" : "border-line-strong hover:border-brand-text"} ${slot.busy ? "pointer-events-none opacity-60" : ""}`}>
+        {src ? <img src={src} alt="" className="h-28 w-40 rounded-md border border-line object-cover" /> : <span className="grid h-28 w-40 place-items-center rounded-md bg-paper text-center text-xs text-muted">No photo yet</span>}
+        <span className="min-w-0 flex-1 space-y-1">
+          <span className="block font-semibold">{slot.busy ? "Uploading…" : src ? "Drop a new photo here to replace it" : "Drop a photo here"}</span>
+          <span className="block text-sm text-muted">or <span className="font-semibold text-brand-text underline underline-offset-4">choose a file</span>. JPG, PNG, WebP, GIF or AVIF, up to 7.5 MB. The original is kept exactly as uploaded.</span>
+        </span>
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" disabled={slot.busy} aria-label={`${label}: choose a file`} className="sr-only" onChange={(e) => { take(e.target.files?.[0]); e.target.value = ""; }} />
+      </label>
+      {slot.id && <button type="button" className="mt-2 text-sm text-brand-text underline underline-offset-4" onClick={slot.clear}>Remove photo</button>}
       {slot.error && <p role="alert" className="mt-2 text-sm text-error">{slot.error}</p>}
     </div>
   );
@@ -93,15 +100,15 @@ function SignIn() {
     finally { setBusy(false); }
   };
   return (
-    <main className="grid min-h-full place-items-center px-4 py-16">
+    <div className="grid min-h-full place-items-center px-4 py-16">
       <form onSubmit={submit} className="w-full max-w-sm space-y-5" aria-labelledby="signin-h">
-        <h1 id="signin-h" className="display text-4xl">Sign in</h1>
+        <div><h1 id="signin-h" className="display text-4xl">Sign in</h1><p className="mt-2 text-muted">Manage the DeboisTech website: programs, photos, team and more.</p></div>
         <Field label="Email"><input className={input} type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Password"><input className={input} type="password" autoComplete="current-password" required value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
         {err && <p role="alert" className="text-sm text-error">{err}</p>}
         <button className={`${btnPrimary} w-full`} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
       </form>
-    </main>
+    </div>
   );
 }
 
@@ -125,7 +132,7 @@ function ProgramForm({ initial, all, onDone }: { initial?: WithId<DbProgram>; al
       const updates: Record<string, unknown> = { [`programs/${id}`]: rec };
       if (rec.flagship) all.filter((p) => p.id !== id && p.flagship).forEach((p) => { updates[`programs/${p.id}/flagship`] = null; }); // only one flagship
       await update(ref(database()), updates);
-      await slot.commit(); onDone();
+      await slot.commit(); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -133,13 +140,13 @@ function ProgramForm({ initial, all, onDone }: { initial?: WithId<DbProgram>; al
       <h3 className="text-xl font-bold">{initial ? "Edit program" : "Add program"}</h3>
       <Field label="Title *"><input className={input} value={v.title} onChange={set_("title")} required /></Field>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Status *"><select className={input} value={v.status} onChange={set_("status")}>{(Object.keys(STATUS_LABEL) as ProgramStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
+        <Field label="Fallback status * (used only when the dates below are empty or unreadable; otherwise the site works it out from the dates)"><select className={input} value={v.status} onChange={set_("status")}>{(Object.keys(STATUS_LABEL) as ProgramStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
         <label className="flex items-center gap-3 self-end pb-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={!!v.flagship} onChange={(e) => setV((p) => ({ ...p, flagship: e.target.checked }))} /> Flagship program (Technology Excellence Program)</label>
       </div>
       <Field label="Summary *" hint="One or two sentences, shown on the Program page."><textarea className={input} rows={3} value={v.summary} onChange={set_("summary")} required /></Field>
       <Field label="Details" hint="Longer description. Blank line = new paragraph."><textarea className={input} rows={5} value={v.details ?? ""} onChange={set_("details")} /></Field>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Start date"><input className={input} value={v.startDate ?? ""} onChange={set_("startDate")} placeholder="e.g. 9 August 2026" /></Field>
+        <Field label="Start date"><input className={input} value={v.startDate ?? ""} onChange={set_("startDate")} placeholder="e.g. 9 August 2026 or 2026-08-09" /></Field>
         <Field label="End date"><input className={input} value={v.endDate ?? ""} onChange={set_("endDate")} placeholder="e.g. 4 October 2026" /></Field>
         <Field label="Duration"><input className={input} value={v.duration ?? ""} onChange={set_("duration")} placeholder="e.g. 8 weeks" /></Field>
         <Field label="Fee"><input className={input} value={v.fee ?? ""} onChange={set_("fee")} placeholder="e.g. ₹15,000" /></Field>
@@ -147,30 +154,31 @@ function ProgramForm({ initial, all, onDone }: { initial?: WithId<DbProgram>; al
       <Field label="Apply / more-info link"><input className={input} type="url" value={v.applyUrl ?? ""} onChange={set_("applyUrl")} placeholder="https://…" /></Field>
       <ImageField slot={slot} label="Image" />
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save program"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save program"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
     </form>
   );
 }
 
-function ProgramsTab() {
+function ProgramsTab({ startNew }: TabProps) {
   const { rows, error } = useList<DbProgram>("programs", true);
-  const [editing, setEditing] = useState<WithId<DbProgram> | "new" | null>(null);
+  const [editing, setEditing] = useState<WithId<DbProgram> | "new" | null>(startNew ? "new" : null);
   const all = useMemo(() => (rows ?? []).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [rows]);
-  const groups: [string, WithId<DbProgram>[]][] = [["Flagship", all.filter((p) => p.flagship)], ["Current (ongoing)", all.filter((p) => !p.flagship && p.status === "current")], ["Upcoming", all.filter((p) => !p.flagship && p.status === "upcoming")], ["Past", all.filter((p) => !p.flagship && p.status === "past")]];
-  const del = async (p: WithId<DbProgram>) => { if (!window.confirm(`Delete "${p.title}"? This cannot be undone.`)) return; await remove(ref(database(), `programs/${p.id}`)); if (p.imageId) await remove(ref(database(), `images/${p.imageId}`)).catch(() => {}); };
+  const eff = (p: WithId<DbProgram>) => programTiming(p).status; // same date-based rule as the public page
+  const groups: [string, WithId<DbProgram>[]][] = [["Flagship", all.filter((p) => p.flagship)], ["Current (ongoing)", all.filter((p) => !p.flagship && eff(p) === "current")], ["Upcoming", all.filter((p) => !p.flagship && eff(p) === "upcoming")], ["Past", all.filter((p) => !p.flagship && eff(p) === "past")]];
+  const del = async (p: WithId<DbProgram>) => { if (!(await askConfirm({ title: `Delete "${p.title}"?`, body: "This cannot be undone.", confirmLabel: "Delete" }))) return; try { await remove(ref(database(), `programs/${p.id}`)); if (p.imageId) await remove(ref(database(), `images/${p.imageId}`)).catch(() => {}); notify("Deleted."); } catch (e) { notify(errText(e), "error"); } };
   if (editing) return <ProgramForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} all={all} onDone={() => setEditing(null)} />;
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between"><p className="text-muted">Shown on the public Program page. Past programs stay listed as history.</p><button className={btnPrimary} onClick={() => setEditing("new")}>Add program</button></div>
       {error && <p role="alert" className="text-error">{error}</p>}
-      {rows === null && !error && <p className="text-muted">Loading…</p>}
+      {rows === null && !error && <ListSkeleton />}
       {rows && rows.length === 0 && <p className="rounded-xl border border-dashed border-line-strong p-6 text-muted">No programs yet. Add one, or use “Import current content” in the Setup tab to bring in the Technology Excellence Program.</p>}
       {groups.filter(([, g]) => g.length).map(([name, g]) => (
         <section key={name}><h3 className="mb-3 text-lg font-bold">{name}</h3>
           <ul className="divide-y divide-line rounded-xl border border-line">{g.map((p) => (
             <li key={p.id} className="flex flex-wrap items-center gap-4 p-4">
               {p.imageId ? <img src={imageSrc(p.imageId)} alt="" className="size-14 rounded-md object-cover" /> : <div className="size-14 rounded-md border border-dashed border-line-strong" />}
-              <div className="mr-auto min-w-0"><p className="font-semibold">{p.title}{p.flagship && <span className="ml-2 rounded-full border border-brand-text px-2 py-0.5 text-xs text-brand-text">Flagship</span>}</p><p className="truncate text-sm text-muted">{STATUS_LABEL[p.status]}{p.startDate ? ` · ${p.startDate}` : ""}</p></div>
+              <div className="mr-auto min-w-0"><p className="font-semibold">{p.title}{p.flagship && <span className="ml-2 rounded-full border border-brand-text px-2 py-0.5 text-xs text-brand-text">Flagship</span>}</p><p className="truncate text-sm text-muted">{STATUS_LABEL[eff(p)]}{programTiming(p).auto ? " (from dates)" : ""}{p.startDate ? ` · ${p.startDate}` : ""}</p></div>
               <button className={btnGhost} onClick={() => setEditing(p)}>Edit</button><button className={btnDanger} onClick={() => void del(p)}>Delete</button>
             </li>))}</ul></section>))}
     </div>
@@ -191,7 +199,7 @@ function TeamForm({ initial, count, onDone }: { initial?: WithId<DbTeam>; count:
     try {
       const id = initial?.id ?? push(ref(database(), "team")).key!;
       const rec: DbTeam = { name: v.name.trim(), title: v.title.trim(), imageId: slot.id, order: v.order ?? count, ...(v.linkedin ? { linkedin: v.linkedin.trim() } : {}) };
-      await set(ref(database(), `team/${id}`), rec); await slot.commit(); onDone();
+      await set(ref(database(), `team/${id}`), rec); await slot.commit(); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -204,23 +212,23 @@ function TeamForm({ initial, count, onDone }: { initial?: WithId<DbTeam>; count:
       <Field label="LinkedIn URL" hint="Optional. Leave blank to show no link."><input className={input} type="url" value={v.linkedin ?? ""} onChange={(e) => setV((p) => ({ ...p, linkedin: e.target.value }))} placeholder="https://www.linkedin.com/in/…" /></Field>
       <ImageField slot={slot} label="Photo *" />
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save member"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save member"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
     </form>
   );
 }
 
-function TeamTab() {
+function TeamTab({ startNew }: TabProps) {
   const { rows, error } = useList<DbTeam>("team", true);
-  const [editing, setEditing] = useState<WithId<DbTeam> | "new" | null>(null);
+  const [editing, setEditing] = useState<WithId<DbTeam> | "new" | null>(startNew ? "new" : null);
   const all = useMemo(() => (rows ?? []).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [rows]);
   const move = async (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= all.length) return; const order = all.map((m) => m.id); [order[i], order[j]] = [order[j], order[i]]; const u: Record<string, number> = {}; order.forEach((id, k) => { u[`team/${id}/order`] = k; }); await update(ref(database()), u); };
-  const del = async (m: WithId<DbTeam>) => { if (!window.confirm(`Remove ${m.name} from the team?`)) return; await remove(ref(database(), `team/${m.id}`)); if (m.imageId) await remove(ref(database(), `images/${m.imageId}`)).catch(() => {}); };
+  const del = async (m: WithId<DbTeam>) => { if (!(await askConfirm({ title: `Remove ${m.name} from the team?`, body: "This cannot be undone.", confirmLabel: "Remove" }))) return; try { await remove(ref(database(), `team/${m.id}`)); if (m.imageId) await remove(ref(database(), `images/${m.imageId}`)).catch(() => {}); notify("Removed."); } catch (e) { notify(errText(e), "error"); } };
   if (editing) return <TeamForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} count={all.length} onDone={() => setEditing(null)} />;
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><p className="text-muted">Order here is the order on the website. Photos are stored losslessly.</p><button className={btnPrimary} onClick={() => setEditing("new")}>Add member</button></div>
       {error && <p role="alert" className="text-error">{error}</p>}
-      {rows === null && !error && <p className="text-muted">Loading…</p>}
+      {rows === null && !error && <ListSkeleton />}
       {rows && rows.length === 0 && <p className="rounded-xl border border-dashed border-line-strong p-6 text-muted">No team members in the database yet, so the website shows its built-in team. Use “Import current content” in the Setup tab to copy that team here, then edit it.</p>}
       <ul className="divide-y divide-line rounded-xl border border-line">
         {all.map((m, i) => (
@@ -258,7 +266,7 @@ function PostForm({ initial, posts, onDone }: { initial?: PostRow; posts: PostRo
         ...(v.publish ? { publishedAt: initial?.published && initial.publishedAt ? initial.publishedAt : Date.now() } : {}) };
       // Drafts live apart from published posts, so unpublished writing is never readable by the public.
       await update(ref(database()), { [`${v.publish ? "posts" : "drafts"}/${id}`]: rec, [`${v.publish ? "drafts" : "posts"}/${id}`]: null });
-      await slot.commit(); onDone();
+      await slot.commit(); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -275,23 +283,23 @@ function PostForm({ initial, posts, onDone }: { initial?: PostRow; posts: PostRo
       <ImageField slot={slot} label="Cover image" />
       <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.publish} onChange={(e) => setV((p) => ({ ...p, publish: e.target.checked }))} /> Published (visible on the website). Untick to keep as a draft.</label>
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : v.publish ? "Save and publish" : "Save draft"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : v.publish ? "Save and publish" : "Save draft"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
     </form>
   );
 }
 
-function BlogTab() {
+function BlogTab({ startNew }: TabProps) {
   const pub = useList<DbPost>("posts", true), dr = useList<DbPost>("drafts", true);
-  const [editing, setEditing] = useState<PostRow | "new" | null>(null);
+  const [editing, setEditing] = useState<PostRow | "new" | null>(startNew ? "new" : null);
   const posts: PostRow[] = useMemo(() => [...(pub.rows ?? []).map((p) => ({ ...p, published: true })), ...(dr.rows ?? []).map((p) => ({ ...p, published: false }))].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)), [pub.rows, dr.rows]);
-  const del = async (p: PostRow) => { if (!window.confirm(`Delete "${p.title}"? This cannot be undone.`)) return; await remove(ref(database(), `${p.published ? "posts" : "drafts"}/${p.id}`)); if (p.coverImageId) await remove(ref(database(), `images/${p.coverImageId}`)).catch(() => {}); };
+  const del = async (p: PostRow) => { if (!(await askConfirm({ title: `Delete "${p.title}"?`, body: "This cannot be undone.", confirmLabel: "Delete" }))) return; try { await remove(ref(database(), `${p.published ? "posts" : "drafts"}/${p.id}`)); if (p.coverImageId) await remove(ref(database(), `images/${p.coverImageId}`)).catch(() => {}); notify("Deleted."); } catch (e) { notify(errText(e), "error"); } };
   const error = pub.error || dr.error;
   if (editing) return <PostForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} posts={posts} onDone={() => setEditing(null)} />;
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><p className="text-muted">Published posts appear at /blog. Drafts are private.</p><button className={btnPrimary} onClick={() => setEditing("new")}>New post</button></div>
       {error && <p role="alert" className="text-error">{error}</p>}
-      {pub.rows === null && !error && <p className="text-muted">Loading…</p>}
+      {pub.rows === null && !error && <ListSkeleton />}
       {pub.rows && posts.length === 0 && <p className="rounded-xl border border-dashed border-line-strong p-6 text-muted">No posts yet.</p>}
       <ul className="divide-y divide-line rounded-xl border border-line">{posts.map((p) => (
         <li key={p.id} className="flex flex-wrap items-center gap-4 p-4">
@@ -324,7 +332,7 @@ function OpeningForm({ initial, openings, onDone }: { initial?: WithId<DbOpening
       const resp = lines(v.responsibilities), reqs = lines(v.requirements);
       const rec: DbOpening = { title: v.title.trim(), slug, location: v.location.trim(), type: v.type.trim(), open: v.open, order: initial?.order ?? openings.length, updatedAt: Date.now(),
         ...(v.summary.trim() ? { summary: v.summary.trim() } : {}), ...(resp.length ? { responsibilities: resp } : {}), ...(reqs.length ? { requirements: reqs } : {}), ...(v.applyUrl.trim() ? { applyUrl: v.applyUrl.trim() } : {}) };
-      await set(ref(database(), `openings/${id}`), rec); onDone();
+      await set(ref(database(), `openings/${id}`), rec); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -344,24 +352,24 @@ function OpeningForm({ initial, openings, onDone }: { initial?: WithId<DbOpening
       <Field label="Apply link" hint="Optional. Blank sends applicants to the Contact form (Careers)."><input className={input} value={v.applyUrl} onChange={(e) => setV((p) => ({ ...p, applyUrl: e.target.value }))} placeholder="https://… or mailto:careers@…" /></Field>
       <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.open} onChange={(e) => setV((p) => ({ ...p, open: e.target.checked }))} /> Open (shown on the Careers page). Untick once the role is filled.</label>
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy}>{busy ? "Saving…" : "Save role"}</button><button type="button" className={btnGhost} onClick={onDone}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy}>{busy ? "Saving…" : "Save role"}</button><button type="button" className={btnGhost} onClick={onDone}>Cancel</button></div>
     </form>
   );
 }
 
-function CareersTab() {
+function CareersTab({ startNew }: TabProps) {
   const { rows, error } = useList<DbOpening>("openings", true);
-  const [editing, setEditing] = useState<WithId<DbOpening> | "new" | null>(null);
+  const [editing, setEditing] = useState<WithId<DbOpening> | "new" | null>(startNew ? "new" : null);
   const all = useMemo(() => (rows ?? []).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [rows]);
   const move = async (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= all.length) return; const order = all.map((o) => o.id); [order[i], order[j]] = [order[j], order[i]]; const u: Record<string, number> = {}; order.forEach((id, k) => { u[`openings/${id}/order`] = k; }); await update(ref(database()), u); };
   const toggle = async (o: WithId<DbOpening>) => { await update(ref(database()), { [`openings/${o.id}/open`]: !o.open, [`openings/${o.id}/updatedAt`]: serverTimestamp() }); };
-  const del = async (o: WithId<DbOpening>) => { if (!window.confirm(`Delete "${o.title}"? This cannot be undone.`)) return; await remove(ref(database(), `openings/${o.id}`)); };
+  const del = async (o: WithId<DbOpening>) => { if (!(await askConfirm({ title: `Delete "${o.title}"?`, body: "This cannot be undone.", confirmLabel: "Delete" }))) return; try { await remove(ref(database(), `openings/${o.id}`)); notify("Deleted."); } catch (e) { notify(errText(e), "error"); } };
   if (editing) return <OpeningForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} openings={all} onDone={() => setEditing(null)} />;
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><p className="text-muted">Open roles appear at /careers. With none open, the page invites people to get in touch.</p><button className={btnPrimary} onClick={() => setEditing("new")}>Add role</button></div>
       {error && <p role="alert" className="text-error">{error}</p>}
-      {rows === null && !error && <p className="text-muted">Loading…</p>}
+      {rows === null && !error && <ListSkeleton />}
       {rows && rows.length === 0 && <p className="rounded-xl border border-dashed border-line-strong p-6 text-muted">No roles yet. The Careers page currently shows “No current openings”.</p>}
       <ul className="divide-y divide-line rounded-xl border border-line">
         {all.map((o, i) => (
@@ -393,7 +401,7 @@ function TestimonialForm({ initial, all, onDone }: { initial?: WithId<DbTestimon
       const rec: DbTestimonial = { quote: v.quote.replace(/\r\n/g, "\n").trim(), name: v.name.trim(), published: v.published, kind: v.kind, order: initial?.order ?? all.length, updatedAt: Date.now(),
         ...(v.role.trim() ? { role: v.role.trim() } : {}), ...(v.company.trim() ? { company: v.company.trim() } : {}), ...(v.program.trim() ? { program: v.program.trim() } : {}),
         ...(v.linkedin.trim() ? { linkedin: v.linkedin.trim() } : {}), ...(v.videoUrl.trim() ? { videoUrl: v.videoUrl.trim() } : {}), ...(slot.id ? { imageId: slot.id } : {}), ...(v.featured ? { featured: true } : {}) };
-      await set(ref(database(), `testimonials/${id}`), rec); await slot.commit(); onDone();
+      await set(ref(database(), `testimonials/${id}`), rec); await slot.commit(); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   const t = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
@@ -420,31 +428,36 @@ function TestimonialForm({ initial, all, onDone }: { initial?: WithId<DbTestimon
       )}
       <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published. Only publish words, names and photos you have permission to use.</label>
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save testimonial"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save testimonial"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
     </form>
   );
 }
 
 /** Shared list tab for content that is ordered, can be hidden, and may own an image: testimonials, achievements and projects. */
-function ManagedTab<T extends { published: boolean; order?: number; imageId?: string }>({ path, intro, addLabel, emptyText, label, sub, Form }: {
+function ManagedTab<T extends { published: boolean; order?: number; imageId?: string }>({ path, intro, addLabel, emptyText, label, sub, Form, startNew }: {
+  startNew?: boolean;
   path: string; intro: string; addLabel: string; emptyText: string; label: (r: WithId<T>) => string; sub: (r: WithId<T>) => string;
   Form: (p: { initial?: WithId<T>; all: WithId<T>[]; onDone: () => void }) => ReactNode;
 }) {
   const { rows, error } = useList<T>(path, true);
-  const [editing, setEditing] = useState<WithId<T> | "new" | null>(null);
+  const [editing, setEditing] = useState<WithId<T> | "new" | null>(startNew ? "new" : null);
+  const [q, setQ] = useState("");
   const all = useMemo(() => (rows ?? []).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [rows]);
   const move = async (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= all.length) return; const order = all.map((x) => x.id); [order[i], order[j]] = [order[j], order[i]]; const u: Record<string, number> = {}; order.forEach((id, k) => { u[`${path}/${id}/order`] = k; }); await update(ref(database()), u); };
-  const toggle = async (r: WithId<T>) => { await update(ref(database()), { [`${path}/${r.id}/published`]: !r.published, [`${path}/${r.id}/updatedAt`]: serverTimestamp() }); };
-  const del = async (r: WithId<T>) => { if (!window.confirm(`Delete "${label(r)}"? This cannot be undone.`)) return; await remove(ref(database(), `${path}/${r.id}`)); if (r.imageId) await remove(ref(database(), `images/${r.imageId}`)).catch(() => {}); };
+  const toggle = async (r: WithId<T>) => { try { await update(ref(database()), { [`${path}/${r.id}/published`]: !r.published, [`${path}/${r.id}/updatedAt`]: serverTimestamp() }); notify(r.published ? "Hidden. It no longer shows on the site." : "Published. It now shows on the site."); } catch (e) { notify(errText(e), "error"); } };
+  const del = async (r: WithId<T>) => { if (!(await askConfirm({ title: `Delete "${label(r)}"?`, body: "This cannot be undone.", confirmLabel: "Delete" }))) return; try { await remove(ref(database(), `${path}/${r.id}`)); if (r.imageId) await remove(ref(database(), `images/${r.imageId}`)).catch(() => {}); notify("Deleted."); } catch (e) { notify(errText(e), "error"); } };
+  const shown = q.trim() ? all.filter((r) => `${label(r)} ${sub(r)}`.toLowerCase().includes(q.trim().toLowerCase())) : all;
   if (editing) return <>{Form({ initial: editing === "new" ? undefined : editing, all, onDone: () => setEditing(null) })}</>;
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4"><p className="text-muted">{intro}</p><button className={btnPrimary} onClick={() => setEditing("new")}>{addLabel}</button></div>
       {error && <p role="alert" className="text-error">{error}</p>}
-      {rows === null && !error && <p className="text-muted">Loading…</p>}
-      {rows && rows.length === 0 && <p className="rounded-xl border border-dashed border-line-strong p-6 text-muted">{emptyText}</p>}
+      {rows === null && !error && <ListSkeleton />}
+      {rows && rows.length === 0 && <div className="rounded-xl border border-dashed border-line-strong p-8 text-center"><p className="mx-auto max-w-md text-muted">{emptyText}</p><button className={`${btnPrimary} mt-4`} onClick={() => setEditing("new")}>{addLabel}</button></div>}
+      {all.length > 5 && <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or text" aria-label="Search this list" className={`${input} !mt-0 max-w-sm`} />}
+      {q.trim() && shown.length === 0 && <p className="text-muted">Nothing matches “{q}”.</p>}
       <ul className="divide-y divide-line rounded-xl border border-line">
-        {all.map((r, i) => (
+        {shown.map((r) => { const i = all.indexOf(r); return (
           <li key={r.id} className="flex flex-wrap items-center gap-4 p-4">
             {r.imageId ? <img src={imageSrc(r.imageId)} alt="" className="size-12 rounded-md object-cover" /> : null}
             <div className="mr-auto min-w-0"><p className="font-semibold">{label(r)}<span className={`ml-2 rounded-full border px-2 py-0.5 text-xs ${r.published ? "border-brand-text text-brand-text" : "border-line-strong text-muted"}`}>{r.published ? "Published" : "Hidden"}</span></p><p className="truncate text-sm text-muted">{sub(r)}</p></div>
@@ -452,13 +465,13 @@ function ManagedTab<T extends { published: boolean; order?: number; imageId?: st
             <button className={btnGhost} onClick={() => void move(i, 1)} disabled={i === all.length - 1} aria-label={`Move ${label(r)} down`}>↓</button>
             <button className={btnGhost} onClick={() => void toggle(r)}>{r.published ? "Hide" : "Publish"}</button>
             <button className={btnGhost} onClick={() => setEditing(r)}>Edit</button><button className={btnDanger} onClick={() => void del(r)}>Delete</button>
-          </li>))}
+          </li>); })}
       </ul>
     </div>
   );
 }
 
-const TestimonialsTab = () => <ManagedTab<DbTestimonial> path="testimonials" intro="Client voices appear on the Services page, learner voices on the TEP page. With none published, those sections are hidden." addLabel="Add testimonial" emptyText="No testimonials yet."
+const TestimonialsTab = ({ startNew }: TabProps) => <ManagedTab<DbTestimonial> startNew={startNew} path="testimonials" intro="Client voices appear on the Services page, learner voices on the TEP page. With none published, those sections are hidden." addLabel="Add testimonial" emptyText="No testimonials yet."
   label={(t) => t.name} sub={(t) => `${t.kind === "learner" ? "Learner · TEP page" : "Client · Services page"} · ${t.quote}`} Form={(p) => <TestimonialForm key={p.initial?.id ?? "new"} {...p} />} />;
 
 /* ---------- achievements ---------- */
@@ -477,7 +490,7 @@ function AchievementForm({ initial, all, onDone }: { initial?: WithId<DbAchievem
       const id = initial?.id ?? push(ref(database(), "achievements")).key!;
       const rec: DbAchievement = { name: v.name.trim(), title: v.title.trim(), label: v.label, published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(),
         ...(v.org.trim() ? { org: v.org.trim() } : {}), ...(v.track ? { track: v.track } : {}), ...(v.date.trim() ? { date: v.date.trim() } : {}), ...(v.linkedin.trim() ? { linkedin: v.linkedin.trim() } : {}), ...(v.story.trim() ? { story: v.story.trim() } : {}), ...(slot.id ? { imageId: slot.id } : {}) };
-      await set(ref(database(), `achievements/${id}`), rec); await slot.commit(); onDone();
+      await set(ref(database(), `achievements/${id}`), rec); await slot.commit(); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -497,11 +510,11 @@ function AchievementForm({ initial, all, onDone }: { initial?: WithId<DbAchievem
       <ImageField slot={slot} label="Photo (with permission)" />
       <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page). Untick to keep as a draft.</label>
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save achievement"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save achievement"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
     </form>
   );
 }
-const AchievementsTab = () => <ManagedTab<DbAchievement> path="achievements" intro="Verified learner milestones for the TEP page. With none published, the section is hidden. Publish only with each learner’s permission." addLabel="Add achievement" emptyText="No achievements yet."
+const AchievementsTab = ({ startNew }: TabProps) => <ManagedTab<DbAchievement> startNew={startNew} path="achievements" intro="Verified learner milestones for the TEP page. With none published, the section is hidden. Publish only with each learner’s permission." addLabel="Add achievement" emptyText="No achievements yet."
   label={(a) => a.name} sub={(a) => `${ACH_LABEL[a.label]} · ${a.title}${a.org ? ` · ${a.org}` : ""}`} Form={(p) => <AchievementForm key={p.initial?.id ?? "new"} {...p} />} />;
 
 /* ---------- projects ---------- */
@@ -523,7 +536,7 @@ function ProjectForm({ initial, all, onDone }: { initial?: WithId<DbProject>; al
       const rec: DbProject = { title: v.title.trim(), kind: v.kind, description: v.description.trim(), published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(),
         ...(v.track ? { track: v.track } : {}), ...(v.problem.trim() ? { problem: v.problem.trim() } : {}), ...(v.contributors.trim() ? { contributors: v.contributors.trim() } : {}), ...(stack.length ? { stack } : {}), ...(deliverables.length ? { deliverables } : {}),
         ...(v.repo.trim() ? { repo: v.repo.trim() } : {}), ...(v.demo.trim() ? { demo: v.demo.trim() } : {}), ...(v.feedback.trim() ? { feedback: v.feedback.trim() } : {}), ...(slot.id ? { imageId: slot.id } : {}) };
-      await set(ref(database(), `projects/${id}`), rec); await slot.commit(); onDone();
+      await set(ref(database(), `projects/${id}`), rec); await slot.commit(); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -548,20 +561,22 @@ function ProjectForm({ initial, all, onDone }: { initial?: WithId<DbProject>; al
       <ImageField slot={slot} label="Screenshot or architecture diagram" />
       <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page). Untick to keep as a draft.</label>
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save project"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save project"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
     </form>
   );
 }
-const ProjectsTab = () => <ManagedTab<DbProject> path="projects" intro="Capstones and learner projects for the TEP page. Each section is hidden until it has a published project." addLabel="Add project" emptyText="No projects yet."
+const ProjectsTab = ({ startNew }: TabProps) => <ManagedTab<DbProject> startNew={startNew} path="projects" intro="Capstones and learner projects for the TEP page. Each section is hidden until it has a published project." addLabel="Add project" emptyText="No projects yet."
   label={(p) => p.title} sub={(p) => `${p.kind === "capstone" ? "Capstone" : "Learner project"}${p.contributors ? ` · ${p.contributors}` : ""}`} Form={(p) => <ProjectForm key={p.initial?.id ?? "new"} {...p} />} />;
 
 /* ---------- mentors ---------- */
-const csv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 12);
+/** Suggestions for the mentor pickers. They come from the program's own tools and modules, plus common extras; anything else can be typed in. */
+const EXPERTISE_OPTIONS = [...new Set([...Object.values(TOOLKIT).flat(), ...Object.values(JOURNEY).flat().flatMap((s) => s.tools ?? []), "Machine learning", "Deep learning", "MLOps", "Data engineering", "DevOps", "Cloud security", "Git", "GitHub Actions", "Jenkins", "Networking", "Shell scripting", "Prompt engineering", "Software architecture", "System design", "Web development", "Cybersecurity"])].sort((a, b) => a.localeCompare(b));
+const MODULE_OPTIONS = [...new Set([...Object.values(JOURNEY).flat().map((s) => s.step), "Project reviews", "Mock interviews", "Resume reviews", "Mentoring"])];
 function MentorForm({ initial, all, onDone }: { initial?: WithId<DbMentor>; all: WithId<DbMentor>[]; onDone: () => void }) {
   const slot = useImageSlot(initial?.imageId);
-  const [v, setV] = useState({ name: initial?.name ?? "", title: initial?.title ?? "", linkedin: initial?.linkedin ?? "", expertise: (initial?.expertise ?? []).join(", "), guides: (initial?.guides ?? []).join(", "), published: initial?.published ?? true });
+  const [v, setV] = useState({ name: initial?.name ?? "", title: initial?.title ?? "", company: initial?.company ?? "", linkedin: initial?.linkedin ?? "", expertise: initial?.expertise ?? ([] as string[]), guides: initial?.guides ?? ([] as string[]), published: initial?.published ?? true });
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
-  const t = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const t = (k: "name" | "title" | "company" | "linkedin") => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
   const save = async (e: FormEvent) => {
     e.preventDefault(); setErr("");
     if (!v.name.trim() || !v.title.trim()) return setErr("Name and role are required.");
@@ -570,10 +585,10 @@ function MentorForm({ initial, all, onDone }: { initial?: WithId<DbMentor>; all:
     setBusy(true);
     try {
       const id = initial?.id ?? push(ref(database(), "mentors")).key!;
-      const ex = csv(v.expertise), gu = csv(v.guides);
+      const ex = v.expertise, gu = v.guides;
       const rec: DbMentor = { name: v.name.trim(), title: v.title.trim(), imageId: slot.id, published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(),
-        ...(v.linkedin.trim() ? { linkedin: v.linkedin.trim() } : {}), ...(ex.length ? { expertise: ex } : {}), ...(gu.length ? { guides: gu } : {}) };
-      await set(ref(database(), `mentors/${id}`), rec); await slot.commit(); onDone();
+        ...(v.company.trim() ? { company: v.company.trim() } : {}), ...(v.linkedin.trim() ? { linkedin: v.linkedin.trim() } : {}), ...(ex.length ? { expertise: ex } : {}), ...(gu.length ? { guides: gu } : {}) };
+      await set(ref(database(), `mentors/${id}`), rec); await slot.commit(); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -584,20 +599,59 @@ function MentorForm({ initial, all, onDone }: { initial?: WithId<DbMentor>; all:
         <Field label="Full name *"><input className={input} value={v.name} onChange={t("name")} required /></Field>
         <Field label="Role *"><input className={input} value={v.title} onChange={t("title")} placeholder="e.g. DevOps Engineer" required /></Field>
       </div>
-      <Field label="LinkedIn profile"><input className={input} type="url" value={v.linkedin} onChange={t("linkedin")} placeholder="https://www.linkedin.com/in/…" /></Field>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Technical expertise" hint="Comma separated."><input className={input} value={v.expertise} onChange={t("expertise")} placeholder="Kubernetes, CI/CD" /></Field>
-        <Field label="Modules or areas they guide" hint="Comma separated."><input className={input} value={v.guides} onChange={t("guides")} placeholder="Containers and Kubernetes" /></Field>
+        <Field label="Company or organisation" hint="Where they work now. Leave empty if it is DeboisTech."><input className={input} value={v.company} onChange={t("company")} placeholder="e.g. ESDS Software Solution" maxLength={80} /></Field>
+        <Field label="LinkedIn profile"><input className={input} type="url" value={v.linkedin} onChange={t("linkedin")} placeholder="https://www.linkedin.com/in/…" /></Field>
       </div>
+      <ChipPicker label="Technical expertise" hint="Pick from the list or type your own." value={v.expertise} onChange={(x) => setV((p) => ({ ...p, expertise: x }))} suggestions={EXPERTISE_OPTIONS} placeholder="Or type your own, e.g. Go" />
+      <ChipPicker label="Modules or areas they guide" hint="Pick from the program’s modules or type your own." value={v.guides} onChange={(x) => setV((p) => ({ ...p, guides: x }))} suggestions={MODULE_OPTIONS} placeholder="Or type your own" />
       <ImageField slot={slot} label="Photo *" />
       <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page)</label>
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save mentor"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save mentor"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
     </form>
   );
 }
-const MentorsTab = () => <ManagedTab<DbMentor> path="mentors" intro="Mentors shown on the TEP page, in this order. With none published, the section is hidden." addLabel="Add mentor" emptyText="No mentors yet."
-  label={(m) => m.name} sub={(m) => `${m.title}${m.guides?.length ? ` · guides ${m.guides.join(", ")}` : ""}`} Form={(p) => <MentorForm key={p.initial?.id ?? "new"} {...p} />} />;
+const MentorsTab = ({ startNew }: TabProps) => <ManagedTab<DbMentor> startNew={startNew} path="mentors" intro="Mentors shown on the TEP page, in this order. With none published, the section is hidden." addLabel="Add mentor" emptyText="No mentors yet."
+  label={(m) => m.name} sub={(m) => `${m.title}${m.company ? ` · ${m.company}` : ""}${m.guides?.length ? ` · guides ${m.guides.join(", ")}` : ""}`} Form={(p) => <MentorForm key={p.initial?.id ?? "new"} {...p} />} />;
+
+/* ---------- community gallery ---------- */
+function CommunityPhotoForm({ initial, all, onDone }: { initial?: WithId<DbCommunityPhoto>; all: WithId<DbCommunityPhoto>[]; onDone: () => void }) {
+  const slot = useImageSlot(initial?.imageId);
+  const [v, setV] = useState({ label: initial?.label ?? "", caption: initial?.caption ?? "", alt: initial?.alt ?? "", position: initial?.position ?? "", published: initial?.published ?? true });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const t = (k: "label" | "caption" | "alt" | "position") => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setErr("");
+    if (!slot.id) return setErr("Add a photo.");
+    if (!v.label.trim()) return setErr("Add the event or community name.");
+    if (!v.alt.trim()) return setErr("Describe what the photo shows. People who cannot see it rely on this.");
+    setBusy(true);
+    try {
+      const id = initial?.id ?? push(ref(database(), "community")).key!;
+      const rec: DbCommunityPhoto = { label: v.label.trim(), alt: v.alt.trim(), imageId: slot.id, published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(), ...(v.caption.trim() ? { caption: v.caption.trim() } : {}), ...(v.position ? { position: v.position } : {}) };
+      await set(ref(database(), `community/${id}`), rec); await slot.commit(); notify("Saved."); onDone();
+    } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={save} className="space-y-5 rounded-xl border border-line p-5">
+      <h3 className="text-xl font-bold">{initial ? "Edit community photo" : "Add community photo"}</h3>
+      <p className="text-sm text-muted">Real photos from events and communities only, with the permission of the people in them. Never stock or generated images.</p>
+      <ImageField slot={slot} label="Photo *" />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Event or community *" hint="Shown on the photo, e.g. DevFest Nashik 2026."><input className={input} value={v.label} onChange={t("label")} maxLength={60} required /></Field>
+        <Field label="Caption" hint="Optional second line, e.g. Speaker session."><input className={input} value={v.caption} onChange={t("caption")} maxLength={90} /></Field>
+      </div>
+      <Field label="When the photo is cropped, keep" hint="Tiles are wide, so tall photos lose their top or bottom. Pick the part that matters."><select className={input} value={v.position} onChange={t("position")}><option value="">The middle</option><option value="50% 15%">The top (faces, stage)</option><option value="50% 85%">The bottom</option></select></Field>
+      <Field label="Describe the photo *" hint="For screen readers, e.g. Students at long tables building with laptops during a workshop."><textarea className={input} rows={2} value={v.alt} onChange={t("alt")} maxLength={240} required /></Field>
+      <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown in the Community gallery on the Company page)</label>
+      {err && <p role="alert" className="text-sm text-error">{err}</p>}
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy || slot.busy}>{busy ? "Saving…" : "Save photo"}</button><button type="button" className={btnGhost} onClick={() => { void slot.discard(); onDone(); }}>Cancel</button></div>
+    </form>
+  );
+}
+const CommunityTab = ({ startNew }: TabProps) => <ManagedTab<DbCommunityPhoto> startNew={startNew} path="community" intro="Photos for the Community gallery on the Company page, in this order (the first is shown largest). With none published, the built-in list is used." addLabel="Add photo" emptyText="No community photos yet. Add the first one."
+  label={(p) => p.label} sub={(p) => p.caption || p.alt} Form={(p) => <CommunityPhotoForm key={p.initial?.id ?? "new"} {...p} />} />;
 
 /* ---------- learner journeys ---------- */
 function JourneyForm({ initial, all, onDone }: { initial?: WithId<DbJourney>; all: WithId<DbJourney>[]; onDone: () => void }) {
@@ -611,7 +665,7 @@ function JourneyForm({ initial, all, onDone }: { initial?: WithId<DbJourney>; al
     try {
       const id = initial?.id ?? push(ref(database(), "journeys")).key!;
       const rec: DbJourney = { before: v.before.trim(), after: v.after.trim(), published: v.published, order: initial?.order ?? all.length, updatedAt: Date.now(), ...(v.who.trim() ? { who: v.who.trim() } : {}), ...(v.track ? { track: v.track } : {}) };
-      await set(ref(database(), `journeys/${id}`), rec); onDone();
+      await set(ref(database(), `journeys/${id}`), rec); notify("Saved."); onDone();
     } catch (x) { setErr(errText(x)); } finally { setBusy(false); }
   };
   return (
@@ -626,12 +680,60 @@ function JourneyForm({ initial, all, onDone }: { initial?: WithId<DbJourney>; al
       </div>
       <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={v.published} onChange={(e) => setV((p) => ({ ...p, published: e.target.checked }))} /> Published (shown on the TEP page). Untick to keep as a draft.</label>
       {err && <p role="alert" className="text-sm text-error">{err}</p>}
-      <div className="flex gap-3"><button className={btnPrimary} disabled={busy}>{busy ? "Saving…" : "Save journey"}</button><button type="button" className={btnGhost} onClick={onDone}>Cancel</button></div>
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex gap-3 rounded-b-xl border-t border-line bg-paper/95 px-5 py-3 backdrop-blur"><button className={btnPrimary} disabled={busy}>{busy ? "Saving…" : "Save journey"}</button><button type="button" className={btnGhost} onClick={onDone}>Cancel</button></div>
     </form>
   );
 }
-const JourneysTab = () => <ManagedTab<DbJourney> path="journeys" intro="Before-and-after learner stories for “Progress you can see” on the TEP page. Hidden until one is published."  addLabel="Add journey" emptyText="No journeys yet."
+const JourneysTab = ({ startNew }: TabProps) => <ManagedTab<DbJourney> startNew={startNew} path="journeys" intro="Before-and-after learner stories for “Progress you can see” on the TEP page. Hidden until one is published."  addLabel="Add journey" emptyText="No journeys yet."
   label={(j) => j.who || j.after} sub={(j) => `${j.before} → ${j.after}`} Form={(p) => <JourneyForm key={p.initial?.id ?? "new"} {...p} />} />;
+
+/* ---------- TEP page switches ---------- */
+const TEP_SECTIONS: { key: TepSectionKey; label: string; heading: string; tab: string }[] = [
+  { key: "capstones", label: "Capstones", heading: "What you’ll build matters more than what you watch.", tab: "Projects (type Capstone)" },
+  { key: "mentors", label: "Mentors", heading: "Meet the mentors.", tab: "Mentors" },
+  { key: "voices", label: "Learner testimonials on the TEP page", heading: "Don’t just take our word for it.", tab: "Testimonials (Shown on: TEP page)" },
+  { key: "programVoices", label: "Learner testimonials on the Program page", heading: "Don’t just take our word for it.", tab: "Testimonials (Shown on: TEP page)" },
+  { key: "career", label: "Career progress", heading: "Career progress & opportunities.", tab: "Achievements" },
+  { key: "learnerProjects", label: "Learner projects", heading: "Built by our learners.", tab: "Projects (type Learner project)" },
+  { key: "progress", label: "Learner journeys", heading: "Progress you can see.", tab: "Journeys" },
+];
+function TepPageTab() {
+  const [on, setOn] = useState<DbTepSections | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => onValue(ref(database(), "settings/tep"), (s) => { setOn((s.val() ?? {}) as DbTepSections); setError(""); }, (e) => setError(errText(e))), []);
+  const projects = useList<DbProject>("projects", true).rows, mentors = useList<DbMentor>("mentors", true).rows, voices = useList<DbTestimonial>("testimonials", true).rows,
+    ach = useList<DbAchievement>("achievements", true).rows, journeys = useList<DbJourney>("journeys", true).rows;
+  const count = (k: TepSectionKey) => {
+    const pub = <T extends { published: boolean }>(r: WithId<T>[] | null, f: (x: WithId<T>) => boolean = () => true) => (r ?? []).filter((x) => x.published && f(x)).length;
+    return k === "capstones" ? pub(projects, (p) => p.kind === "capstone") : k === "learnerProjects" ? pub(projects, (p) => p.kind === "learner") : k === "mentors" ? pub(mentors)
+      : (k === "voices" || k === "programVoices") ? pub(voices, (t) => t.kind === "learner") : k === "career" ? pub(ach) : pub(journeys);
+  };
+  const flip = async (k: TepSectionKey, v: boolean) => { try { await set(ref(database(), `settings/tep/${k}`), v); } catch (e) { setError(errText(e)); } };
+  return (
+    <div className="max-w-3xl space-y-6">
+      <p className="text-muted">Choose which optional sections appear on the TEP page. Each one is off until you switch it on, and a section also needs at least one published entry before visitors see it. The page can take up to a minute to update.</p>
+      {error && <p role="alert" className="text-error">{error}</p>}
+      {on === null && !error && <p className="text-muted">Loading…</p>}
+      {on && (
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {TEP_SECTIONS.map((s) => {
+            const checked = on[s.key] === true, n = count(s.key);
+            return (
+              <li key={s.key} className="flex flex-wrap items-center gap-4 p-4">
+                <div className="mr-auto min-w-0">
+                  <p className="font-semibold">{s.label}<span className={`ml-2 rounded-full border px-2 py-0.5 text-xs ${checked ? "border-brand-text text-brand-text" : "border-line-strong text-muted"}`}>{checked ? "On" : "Off"}</span></p>
+                  <p className="text-sm text-muted">“{s.heading}”</p>
+                  <p className="text-sm text-muted">{n} published {n === 1 ? "entry" : "entries"} in {s.tab}{checked && n === 0 ? ". Nothing shows on the live site until you publish one." : "."}</p>
+                </div>
+                <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" role="switch" className="size-5 accent-[var(--brand)]" checked={checked} onChange={(e) => void flip(s.key, e.target.checked)} />Show on the TEP page</label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /* ---------- setup ---------- */
 function SetupTab({ user }: { user: User }) {
@@ -672,15 +774,62 @@ function SetupTab({ user }: { user: User }) {
   );
 }
 
-/* ---------- shell ---------- */
-const TABS = ["Programs", "Team", "Blog", "Careers", "Testimonials", "Mentors", "Achievements", "Projects", "Journeys", "Setup"] as const;
-type Tab = (typeof TABS)[number];
+/* ---------- overview ---------- */
+const ADD_LABEL: Record<string, string> = { programs: "Add a program", team: "Add a person", blog: "Write a post", careers: "Add a role", community: "Add a photo", testimonials: "Add a testimonial", mentors: "Add a mentor", achievements: "Add an achievement", projects: "Add a project", journeys: "Add a journey" };
+
+function Overview({ counts, onOpen }: { counts: Record<string, number | undefined>; onOpen: (id: string, add?: boolean) => void }) {
+  const loaded = SECTIONS.filter((x) => x.path).every((x) => counts[x.id] !== undefined);
+  const empty = loaded && SECTIONS.filter((x) => x.path).every((x) => !counts[x.id]);
+  return (
+    <div className="space-y-8">
+      {empty && (
+        <div className="rounded-xl border border-brand-text bg-wash p-5">
+          <p className="font-semibold">Nothing has been added yet.</p>
+          <p className="mt-1 text-muted">Start with Setup to import the team and the Technology Excellence Program, then add photos and stories.</p>
+          <button className={`${btnPrimary} mt-4`} onClick={() => onOpen("setup")}>Go to Setup</button>
+        </div>
+      )}
+      <ul className="grid gap-4 sm:grid-cols-2">
+        {SECTIONS.filter((x) => x.path).map((x) => {
+          const n = counts[x.id];
+          return (
+            <li key={x.id} className="flex flex-col rounded-xl border border-line bg-wash p-5">
+              <div className="flex items-baseline justify-between gap-3"><h2 className="text-lg font-bold">{x.label}</h2><p className="text-sm text-muted">{n === undefined ? "…" : n === 0 ? "None yet" : `${n} ${n === 1 ? "item" : "items"}`}</p></div>
+              <p className="mt-1 flex-1 text-sm text-muted">{x.blurb}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button className={btnPrimary} onClick={() => onOpen(x.id, true)}>{ADD_LABEL[x.id]}</button>
+                <button className={btnGhost} onClick={() => onOpen(x.id)}>Manage</button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** How many items each section holds, for the menu badges and the overview. */
+function useCounts(enabled: boolean) {
+  const [c, setC] = useState<Record<string, number | undefined>>({});
+  useEffect(() => {
+    if (!enabled) return;
+    const offs = SECTIONS.filter((x) => x.path).map((x) => onValue(ref(database(), x.path!), (snap) => setC((p) => ({ ...p, [x.id]: snap.size })), () => {}));
+    return () => offs.forEach((off) => off());
+  }, [enabled]);
+  return c;
+}
+
+const sectionFromHash = () => { const h = typeof window === "undefined" ? "" : window.location.hash.slice(1); return ALL_SECTIONS.some((x) => x.id === h) ? h : "overview"; };
 
 export function DashboardApp() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [adminErr, setAdminErr] = useState("");
-  const [tab, setTab] = useState<Tab>("Programs");
+  const [tab, setTab] = useState(sectionFromHash); // the address bar remembers where you are, so a refresh or a shared link lands on the same section
+  const [startNew, setStartNew] = useState(false);
+  const counts = useCounts(isAdmin === true);
+  useEffect(() => { const on = () => setTab(sectionFromHash()); window.addEventListener("hashchange", on); return () => window.removeEventListener("hashchange", on); }, []);
+  const open = (id: string, add = false) => { setStartNew(add); setTab(id); window.history.replaceState(null, "", `#${id}`); };
 
   useEffect(() => onAuthStateChanged(auth(), (u) => { setUser(u); setIsAdmin(null); setAdminErr(""); }), []);
   useEffect(() => {
@@ -694,29 +843,21 @@ export function DashboardApp() {
   if (!user) return <SignIn />;
   if (isAdmin === null) return <p className="p-8 text-muted" role="status">Checking access…</p>;
   if (!isAdmin) return (
-    <main className="mx-auto max-w-xl space-y-4 px-4 py-16">
+    <div className="mx-auto max-w-xl space-y-4 px-4 py-16">
       <h1 className="display text-4xl">No access yet</h1>
       <p className="text-muted">You are signed in as {user.email}, but this account is not an administrator.</p>
       <p className="text-muted">In the Firebase console, open Realtime Database → Data and add <code className="rounded bg-wash px-2 py-1 text-ink">admins / {user.uid} = true</code>. Then reload this page.</p>
       {adminErr && <p role="alert" className="text-error">{adminErr}</p>}
       <button className={btnGhost} onClick={() => void signOut(auth())}>Sign out</button>
-    </main>
+    </div>
   );
   return (
-    <div>
-      <header className="sticky top-0 z-10 border-b border-line bg-paper/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 px-4 py-3">
-          <h1 className="mr-auto text-lg font-bold">DeboisTech dashboard</h1>
-          <span className="hidden text-sm text-muted sm:inline">{user.email}</span>
-          <button className={btnGhost} onClick={() => void signOut(auth())}>Sign out</button>
-        </div>
-        <nav aria-label="Dashboard sections" className="mx-auto max-w-5xl px-4"><div role="tablist" className="flex gap-1 overflow-x-auto">
-          {TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${tab === t ? "border-glow text-ink" : "border-transparent text-muted hover:text-ink"}`}>{t}</button>)}
-        </div></nav>
-      </header>
-      <main className="mx-auto max-w-5xl px-4 py-8" role="tabpanel" aria-label={tab}>
-        {tab === "Programs" && <ProgramsTab />}{tab === "Team" && <TeamTab />}{tab === "Blog" && <BlogTab />}{tab === "Careers" && <CareersTab />}{tab === "Testimonials" && <TestimonialsTab />}{tab === "Mentors" && <MentorsTab />}{tab === "Achievements" && <AchievementsTab />}{tab === "Journeys" && <JourneysTab />}{tab === "Projects" && <ProjectsTab />}{tab === "Setup" && <SetupTab user={user} />}
-      </main>
-    </div>
+    <Shell email={user.email ?? ""} onSignOut={() => void signOut(auth())} current={tab} onPick={(id) => open(id)} counts={counts}>
+      {tab === "overview" && <Overview counts={counts} onOpen={open} />}
+      {tab === "programs" && <ProgramsTab startNew={startNew} />}{tab === "team" && <TeamTab startNew={startNew} />}{tab === "blog" && <BlogTab startNew={startNew} />}{tab === "careers" && <CareersTab startNew={startNew} />}
+      {tab === "community" && <CommunityTab startNew={startNew} />}{tab === "testimonials" && <TestimonialsTab startNew={startNew} />}{tab === "mentors" && <MentorsTab startNew={startNew} />}{tab === "achievements" && <AchievementsTab startNew={startNew} />}{tab === "projects" && <ProjectsTab startNew={startNew} />}{tab === "journeys" && <JourneysTab startNew={startNew} />}
+      {tab === "tep" && <TepPageTab />}
+      {tab === "setup" && <SetupTab user={user} />}
+    </Shell>
   );
 }

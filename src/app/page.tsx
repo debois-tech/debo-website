@@ -4,7 +4,7 @@ import { EcosystemScene } from "@/components/EcosystemScene";
 import { ProductCarousel } from "@/components/ProductCarousel";
 import { ProductSlide } from "@/components/ProductSlide";
 import { ServicesExplorer } from "@/components/ServicesExplorer";
-import { TepJourney } from "@/components/TepJourney";
+import { TepBuild } from "@/components/TepBuild";
 import { TeamCarousel } from "@/components/TeamCarousel";
 import { CultureGallery } from "@/components/CultureGallery";
 import { PixelEdge } from "@/components/PixelEdge";
@@ -69,7 +69,7 @@ export default async function HomePage() {
       <PixelEdge from="var(--paper)" to="#ffffff" />
       <Section theme="white" labelledBy="tep">
         <SectionHeader id="tep" title="Learn by building." lead={TEP_INTRO} />
-        <TepJourney />
+        <TepBuild />
       </Section>
 
       <PixelEdge from="#ffffff" to="var(--paper)" />

@@ -1,13 +1,14 @@
+import type { ReactNode } from "react";
 import Image from "next/image";
+import { TrackedLink } from "./TrackedLink";
 import Link from "next/link";
 import { BUILD_WALL, COMMUNITY_CTA, COMMUNITY_EYEBROW, COMMUNITY_HEADLINE, COMMUNITY_LEAD, COMMUNITY_STORIES, CONTRIBUTIONS, IMPACT_METRICS, PARTNERS, SHOW_PLACEHOLDERS } from "@/content/community";
-import { CommunityGallery } from "./CommunityGallery";
 import { CommunityStoryCard } from "./CommunityStoryCard";
 import { InView } from "./InView";
 import { ButtonLink, SectionHeader } from "./ui";
 
-/** Community work as an editorial page: impact, how we contribute, photos, stories, people and a call to collaborate. Content: src/content/community.ts. */
-export function CommunitySection({ headingId = "community" }: { headingId?: string }) {
+/** Community work as an editorial page: impact, how we contribute (this part), then the photo gallery, then stories and a call to collaborate. Content: src/content/community.ts. */
+export function CommunityIntro({ headingId = "community" }: { headingId?: string }) {
   const metrics = IMPACT_METRICS.filter((m) => m.value || SHOW_PLACEHOLDERS);
   return (
     <>
@@ -41,7 +42,10 @@ export function CommunitySection({ headingId = "community" }: { headingId?: stri
                     ? <Image src={pt.logo.src} alt={pt.logo.alt} width={pt.logo.width} height={pt.logo.height} className="h-auto max-h-[5.25rem] w-auto max-w-full object-contain transition-transform duration-500 group-hover:scale-[1.04] sm:max-h-24" />
                     : <span className="text-center text-lg font-semibold leading-tight text-black sm:text-xl">{pt.name}</span>}
                 </div>
-                <div className="p-3 sm:p-4"><p className="sr-only">{pt.name}. </p><p className="text-sm text-muted">{pt.role}</p></div>
+                <div className="p-3 sm:p-4">
+                  <p className="sr-only">{pt.name}. </p><p className="text-sm text-muted">{pt.role}</p>
+                  {pt.proof && <p className="mt-2"><TrackedLink href={pt.proof.href} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-text underline underline-offset-4 hover:text-ink">{pt.proof.label}</TrackedLink></p>}
+                </div>
               </li>
             ))}
           </ul>
@@ -68,12 +72,17 @@ export function CommunitySection({ headingId = "community" }: { headingId?: stri
           </ul>
         </InView>
       </div>
+    </>
+  );
+}
 
-      <CommunityGallery />
-
+/** Stories, build wall and the closing invitation: the part after the photo gallery. */
+export function CommunityMore({ children }: { children?: ReactNode }) {
+  return (
+    <>
       {/* stories */}
-      <div className="mt-16 sm:mt-24">
-        <h3 className="display text-3xl sm:text-5xl">Stories from the ecosystem.</h3>
+      <div>
+        <h3 id="community-stories" className="display text-3xl sm:text-5xl">Stories from the ecosystem.</h3>
         <InView>
           <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-12">
             {COMMUNITY_STORIES.map((s, i) => <CommunityStoryCard key={s.id} story={s} index={i} total={COMMUNITY_STORIES.length} />)}
@@ -108,6 +117,7 @@ export function CommunitySection({ headingId = "community" }: { headingId?: stri
         <div className="mt-7 flex flex-wrap gap-3">
           <ButtonLink href="/contact?intent=partnership" event="hero_cta_click" eventProps={{ cta_id: "community_collaborate" }}>Collaborate with DeboisTech</ButtonLink>
           <ButtonLink href="/work" variant="secondary">Explore our work</ButtonLink>
+          {children}
         </div>
       </div>
     </>

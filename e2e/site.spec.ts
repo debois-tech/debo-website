@@ -238,13 +238,16 @@ test("pixel edges never leave a seam before the next section, at fractional brow
   }
 });
 
-test("Company page has a community section covering GDG Nashik and CNCG Nashik", async ({ page }) => {
+test("Company page has a community section covering GDG Nashik and CNCG Nashik, with proof links", async ({ page }) => {
   await page.goto("/company");
   const sec = page.locator("section[aria-labelledby='community']");
   await expect(sec.getByRole("heading", { level: 2, name: "We build more than software. We build ecosystems." })).toBeVisible();
-  await expect(sec.getByRole("heading", { level: 3, name: "From Prompt to Prod" })).toBeVisible();
-  await expect(sec.getByText("Cloud Native & AI: from Kubernetes to Intelligent Systems").first()).toBeVisible();
-  await expect(sec.getByText("215 CC Lab, MET Institute of Engineering, Nashik")).toBeVisible();
+  // Stories sit under the intro, or in the photo gallery's dark section once community photos exist, so look page-wide for them.
+  await expect(page.getByRole("heading", { level: 3, name: "From Prompt to Prod" })).toBeVisible();
+  await expect(sec.getByText("Community partner", { exact: true })).toBeVisible();                                   // GDG Nashik tile
+  await expect(sec.getByText("Part of the Cloud Native & AI community", { exact: true })).toBeVisible();             // CNCG Nashik tile
+  await expect(sec.getByRole("link", { name: /Partner Finder profile/ })).toHaveAttribute("href", "https://cloud.google.com/find-a-partner/partner/deboistech");
+  await expect(sec.getByRole("link", { name: /GDG Nashik partners list/ })).toHaveAttribute("href", "https://gdgnashik.com/#partners");
 });
 
 test("navbar: Program replaces Academy / TEP, Debo Labs is gone, and the CTA is compact", async ({ page }) => {
@@ -261,10 +264,10 @@ test("navbar: Program replaces Academy / TEP, Debo Labs is gone, and the CTA is 
   await expect(nav.getByRole("link", { name: "Program" })).toHaveAttribute("aria-current", "page"); // TEP pages live under Program
   await page.goto("/program");
   await expect(page.getByRole("heading", { level: 3, name: "Technology Excellence Program" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "See the program" })).toHaveAttribute("href", "/tep");
+  await expect(page.getByRole("link", { name: "See the curriculum" })).toHaveAttribute("href", "/tep");
 });
 
-test("team shows all seven members; a member without a LinkedIn URL gets no empty link", async ({ page }) => {
+test("team shows every member with a portrait; LinkedIn links are real, never empty", async ({ page }) => {
   await page.goto("/company");
   const team = page.locator("section[aria-labelledby='team']");
   for (const [n, t] of [["Harshad Gangurde", "Business Development Executive"], ["Atharv Borse", "Cloud Engineer"]]) {
@@ -272,14 +275,18 @@ test("team shows all seven members; a member without a LinkedIn URL gets no empt
     await expect(team.getByText(t, { exact: true })).toBeVisible();
     await expect(team.getByRole("img", { name: `Portrait of ${n}` })).toBeVisible();
   }
-  expect(await team.getByRole("img", { name: /^Portrait of / }).count()).toBe(7);
-  expect(await team.getByRole("link", { name: /LinkedIn profile of/ }).count()).toBe(5); // only the five with profiles
+  // The team can be edited in the dashboard, so do not pin the exact count: at least the seven we know, and every link points somewhere.
+  const portraits = await team.getByRole("img", { name: /^Portrait of / }).count();
+  expect(portraits).toBeGreaterThanOrEqual(7);
+  const hrefs = await team.getByRole("link", { name: /LinkedIn profile of/ }).evaluateAll((a) => a.map((x) => (x as HTMLAnchorElement).getAttribute("href")));
+  expect(hrefs.length).toBeLessThanOrEqual(portraits);
+  for (const h of hrefs) expect(h, "a LinkedIn link must never be empty").toMatch(/^https:\/\//);
 });
 
 test.describe("team carousel", () => {
   const scrollLeft = (page: import("@playwright/test").Page) => page.evaluate(() => document.querySelector<HTMLElement>("section[aria-labelledby='team'] [aria-roledescription='carousel'] ul")!.scrollLeft);
 
-  test("slides on its own, pauses on the pause button, and loops back to the start", async ({ page }) => {
+  test("slides on its own, holds while the pointer is over it, and loops back to the start", async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto("/company");
@@ -288,11 +295,12 @@ test.describe("team carousel", () => {
     await page.mouse.move(5, 5); // keep the pointer off the carousel
     const start = await scrollLeft(page);
     await expect.poll(() => scrollLeft(page), { timeout: 12_000 }).toBeGreaterThan(start + 100); // autoplay advanced
-    await car.getByRole("button", { name: "Pause automatic sliding" }).click();
-    await expect(car.getByRole("button", { name: "Play automatic sliding" })).toHaveAttribute("aria-pressed", "false");
-    const paused = await scrollLeft(page);
-    await page.waitForTimeout(5000);
-    expect(Math.abs((await scrollLeft(page)) - paused)).toBeLessThan(4);                         // nothing moves while paused
+    const box = (await car.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);                          // pointer over it: autoplay holds
+    await page.waitForTimeout(400);
+    const held = await scrollLeft(page);
+    await page.waitForTimeout(4000);
+    expect(Math.abs((await scrollLeft(page)) - held)).toBeLessThan(4);
     let peak = await scrollLeft(page), wrapped = false;
     for (let i = 0; i < 8 && !wrapped; i++) {                                                     // keep pressing Next: at the end it must wrap to the start
       await car.getByRole("button", { name: "Next team members" }).click(); await page.waitForTimeout(700);
@@ -302,12 +310,12 @@ test.describe("team carousel", () => {
     expect(wrapped, "Next past the last card should loop back to the first").toBe(true);
   });
 
-  test("reduced motion: no autoplay, play button offered (and Play opts in), arrows still work", async ({ browser }) => {
+  test("reduced motion: no autoplay, arrows still work", async ({ browser }) => {
     const ctx = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 1366, height: 900 } });
     const page = await ctx.newPage();
     await page.goto("http://localhost:3100/company");
     const car = page.locator("section[aria-labelledby='team'] [aria-roledescription='carousel']");
-    await expect(car.getByRole("button", { name: "Play automatic sliding" })).toBeVisible();
+    await car.scrollIntoViewIfNeeded();
     await page.waitForTimeout(5000);
     expect(await scrollLeft(page)).toBeLessThan(4);
     await car.getByRole("button", { name: "Next team members" }).click();

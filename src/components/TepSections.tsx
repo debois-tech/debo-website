@@ -4,6 +4,7 @@ import type { AchievementLabel, DbAchievement, DbJourney, DbMentor, DbProject, D
 import { imageUrl } from "@/lib/content";
 import { ButtonLink, SectionHeader } from "./ui";
 import { InView } from "./InView";
+import { ExpandableQuote } from "./ExpandableQuote";
 
 const dot = <span aria-hidden className="mt-2 size-1.5 shrink-0 bg-brand-logo" />;
 const Placeholder = ({ children }: { children: string }) => (
@@ -119,7 +120,7 @@ export function TepMentors({ id, items }: { id: string; items: WithId<DbMentor>[
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{m.name}</h3>
-                  <p className="text-sm text-muted">{m.title}</p>
+                  <p className="text-sm text-muted">{m.title}{m.company && <> · {m.company}</>}</p>
                   {m.expertise && m.expertise.length > 0 && <ul aria-label="Expertise" className="mt-3 flex flex-wrap gap-2">{m.expertise.map((x) => <li key={x} className="rounded-full border border-line-strong px-3 py-0.5 text-sm">{x}</li>)}</ul>}
                   {m.guides && m.guides.length > 0 && <p className="mt-3 text-[15px]"><span className="font-semibold">Guides. </span><span className="text-muted">{m.guides.join(", ")}</span></p>}
                   {m.linkedin && <a href={m.linkedin} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-brand-text underline underline-offset-4">LinkedIn<span className="sr-only"> profile of {m.name} (opens in a new tab)</span></a>}
@@ -155,7 +156,7 @@ export function TepVoices({ id, items }: { id: string; items: WithId<DbTestimoni
         <InView>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
             <figure className="reveal flex flex-col rounded-[var(--radius)] border border-line bg-paper p-6 sm:p-9">
-              <blockquote className="display whitespace-pre-line break-words text-2xl leading-snug sm:text-3xl">“{featured.quote}”</blockquote>
+              <ExpandableQuote text={featured.quote} lines={6} threshold={320} className={featured.quote.length <= 180 ? "display text-2xl leading-snug sm:text-3xl" : "text-lg leading-relaxed sm:text-xl"} />
               <figcaption className="mt-6 flex items-center gap-4">
                 <Photo id={featured.imageId} alt={`Portrait of ${featured.name}`} className="size-16 rounded-full border border-line object-cover" />
                 <div><p className="font-semibold">{featured.name}</p>{who(featured) && <p className="text-sm text-muted">{who(featured)}</p>}{featured.program && <p className="text-sm text-brand-text">{featured.program}</p>}</div>
@@ -166,7 +167,7 @@ export function TepVoices({ id, items }: { id: string; items: WithId<DbTestimoni
               <ul className="grid grid-cols-1 gap-5 content-start">
                 {rest.map((t, i) => (
                   <li key={t.id} className="reveal rounded-[var(--radius)] border border-line bg-paper p-5 transition-colors hover:border-brand-text" style={{ ["--d" as string]: `${(i % 3) * 0.07}s` }}>
-                    <blockquote className="whitespace-pre-line break-words">“{t.quote}”</blockquote>
+                    <ExpandableQuote text={t.quote} lines={5} threshold={200} />
                     <div className="mt-4 flex items-center gap-3">
                       <Photo id={t.imageId} alt={`Portrait of ${t.name}`} className="size-11 rounded-full border border-line object-cover" />
                       <div><p className="font-semibold">{t.name}</p><p className="text-sm text-muted">{[who(t), t.program].filter(Boolean).join(" · ")}</p></div>

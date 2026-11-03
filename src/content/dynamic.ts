@@ -27,7 +27,12 @@ export type DbProject = {
   repo?: string; demo?: string; feedback?: string; imageId?: string; published: boolean; order?: number; updatedAt?: number;
 };
 /** A TEP mentor. Only add people who actually mentor on the program; never add qualifications or employers you cannot verify. */
-export type DbMentor = { name: string; title: string; imageId?: string; linkedin?: string; expertise?: string[]; guides?: string[]; published: boolean; order?: number; updatedAt?: number };
+export type DbMentor = { name: string; title: string; /** Company or organisation they work for */ company?: string; imageId?: string; linkedin?: string; expertise?: string[]; guides?: string[]; published: boolean; order?: number; updatedAt?: number };
 /** A real learner journey, shared with the learner's permission. */
 export type DbJourney = { before: string; after: string; who?: string; track?: string; published: boolean; order?: number; updatedAt?: number };
+/** A photo in the Community gallery on the Company page. Real event photos only, shown with the permission of the people in them. */
+export type DbCommunityPhoto = { label: string; alt: string; imageId: string; caption?: string; /** CSS object-position, so a tall photo cropped into a wide tile keeps its subject in frame */ position?: string; published: boolean; order?: number; updatedAt?: number };
+/** Which optional sections of the TEP page are switched on. Missing means off. Managed in the dashboard (TEP page tab). */
+export type TepSectionKey = "capstones" | "mentors" | "voices" | "programVoices" | "career" | "learnerProjects" | "progress";
+export type DbTepSections = Partial<Record<TepSectionKey, boolean>>;
 export type WithId<T> = T & { id: string };

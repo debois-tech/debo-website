@@ -7,7 +7,7 @@ import { ButtonLink } from "./ui";
 /**
  * Compact services explorer: pick a service in the list, read it in the panel.
  * Desktop: list on the left, panel on the right. Phones: the list becomes a swipeable row of chips above the panel.
- * Click, tap, arrow keys (Home/End too) or hover with a mouse all change the selection; the panel keeps a fixed height so the page never jumps.
+ * Click, tap, arrow keys (Home/End too) or moving a mouse over a tab all change the selection (a still pointer never does, so keyboard use is not overridden when the page scrolls under it); the panel keeps a fixed height so the page never jumps.
  */
 export function ServicesExplorer() {
   const [i, setI] = useState(0);
@@ -28,7 +28,7 @@ export function ServicesExplorer() {
           const on = n === i;
           return (
             <button key={x.slug} ref={(el) => { refs.current[n] = el; }} role="tab" id={`svc-tab-${x.slug}`} aria-selected={on} aria-controls="svc-panel" tabIndex={on ? 0 : -1}
-              onClick={() => pick(n)} onKeyDown={(e) => onKey(e, n)} onPointerEnter={(e) => { if (e.pointerType === "mouse" && !on) pick(n); }}
+              onClick={() => pick(n)} onKeyDown={(e) => onKey(e, n)} onPointerMove={(e) => { if (e.pointerType === "mouse" && !on) pick(n); }}
               className={`group relative shrink-0 whitespace-nowrap rounded-full border px-4 py-2.5 text-left text-base font-semibold transition-colors lg:flex lg:min-h-14 lg:items-center lg:justify-between lg:whitespace-normal lg:rounded-none lg:border-0 lg:border-b lg:border-line lg:px-3 lg:py-0 lg:text-xl ${on ? "border-ink bg-ink text-white lg:bg-wash lg:text-ink" : "border-line-strong text-muted hover:text-ink"}`}>
               <span aria-hidden className={`absolute inset-y-0 left-0 hidden w-1 bg-brand-logo transition-transform duration-300 lg:block ${on ? "scale-y-100" : "scale-y-0"}`} />
               <span className="lg:pl-3">{x.name}</span>

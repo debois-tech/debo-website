@@ -14,5 +14,5 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!b64 || typeof b64 !== "string" || !mime || !SAFE.has(mime)) return new Response("Not found", { status: 404 });
   let bytes: Uint8Array;
   try { bytes = base64ToBytes(b64); } catch { return new Response("Not found", { status: 404 }); }
-  return new Response(bytes as BodyInit, { headers: { "Content-Type": mime, "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" } });
+  return new Response(bytes as BodyInit, { headers: { "Content-Type": mime, "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
 }
