@@ -30,4 +30,7 @@ export type DbProject = {
 export type DbMentor = { name: string; title: string; imageId?: string; linkedin?: string; expertise?: string[]; guides?: string[]; published: boolean; order?: number; updatedAt?: number };
 /** A real learner journey, shared with the learner's permission. */
 export type DbJourney = { before: string; after: string; who?: string; track?: string; published: boolean; order?: number; updatedAt?: number };
+/** Which optional sections of the TEP page are switched on. Missing means off. Managed in the dashboard (TEP page tab). */
+export type TepSectionKey = "capstones" | "mentors" | "voices" | "programVoices" | "career" | "learnerProjects" | "progress";
+export type DbTepSections = Partial<Record<TepSectionKey, boolean>>;
 export type WithId<T> = T & { id: string };

@@ -5,7 +5,8 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } fr
 import { get, onValue, push, ref, remove, serverTimestamp, set, update } from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 import { base64ToObjectUrl, imageSrc, prepareImage } from "@/lib/images";
-import type { AchievementLabel, DbAchievement, DbJourney, DbMentor, DbOpening, DbPost, DbProgram, DbProject, DbTeam, DbTestimonial, ProgramStatus, WithId } from "@/content/dynamic";
+import { programTiming } from "@/lib/program-status";
+import type { AchievementLabel, DbAchievement, DbJourney, DbMentor, DbOpening, DbPost, DbProgram, DbProject, DbTeam, DbTepSections, DbTestimonial, ProgramStatus, TepSectionKey, WithId } from "@/content/dynamic";
 import { TEAM } from "@/content/team";
 import { TEP_INTRO } from "@/content/tep";
 
@@ -133,13 +134,13 @@ function ProgramForm({ initial, all, onDone }: { initial?: WithId<DbProgram>; al
       <h3 className="text-xl font-bold">{initial ? "Edit program" : "Add program"}</h3>
       <Field label="Title *"><input className={input} value={v.title} onChange={set_("title")} required /></Field>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Status *"><select className={input} value={v.status} onChange={set_("status")}>{(Object.keys(STATUS_LABEL) as ProgramStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
+        <Field label="Fallback status * (used only when the dates below are empty or unreadable; otherwise the site works it out from the dates)"><select className={input} value={v.status} onChange={set_("status")}>{(Object.keys(STATUS_LABEL) as ProgramStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
         <label className="flex items-center gap-3 self-end pb-3 text-sm font-semibold"><input type="checkbox" className="size-5 accent-[var(--brand)]" checked={!!v.flagship} onChange={(e) => setV((p) => ({ ...p, flagship: e.target.checked }))} /> Flagship program (Technology Excellence Program)</label>
       </div>
       <Field label="Summary *" hint="One or two sentences, shown on the Program page."><textarea className={input} rows={3} value={v.summary} onChange={set_("summary")} required /></Field>
       <Field label="Details" hint="Longer description. Blank line = new paragraph."><textarea className={input} rows={5} value={v.details ?? ""} onChange={set_("details")} /></Field>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Start date"><input className={input} value={v.startDate ?? ""} onChange={set_("startDate")} placeholder="e.g. 9 August 2026" /></Field>
+        <Field label="Start date"><input className={input} value={v.startDate ?? ""} onChange={set_("startDate")} placeholder="e.g. 9 August 2026 or 2026-08-09" /></Field>
         <Field label="End date"><input className={input} value={v.endDate ?? ""} onChange={set_("endDate")} placeholder="e.g. 4 October 2026" /></Field>
         <Field label="Duration"><input className={input} value={v.duration ?? ""} onChange={set_("duration")} placeholder="e.g. 8 weeks" /></Field>
         <Field label="Fee"><input className={input} value={v.fee ?? ""} onChange={set_("fee")} placeholder="e.g. ₹15,000" /></Field>
@@ -156,7 +157,8 @@ function ProgramsTab() {
   const { rows, error } = useList<DbProgram>("programs", true);
   const [editing, setEditing] = useState<WithId<DbProgram> | "new" | null>(null);
   const all = useMemo(() => (rows ?? []).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [rows]);
-  const groups: [string, WithId<DbProgram>[]][] = [["Flagship", all.filter((p) => p.flagship)], ["Current (ongoing)", all.filter((p) => !p.flagship && p.status === "current")], ["Upcoming", all.filter((p) => !p.flagship && p.status === "upcoming")], ["Past", all.filter((p) => !p.flagship && p.status === "past")]];
+  const eff = (p: WithId<DbProgram>) => programTiming(p).status; // same date-based rule as the public page
+  const groups: [string, WithId<DbProgram>[]][] = [["Flagship", all.filter((p) => p.flagship)], ["Current (ongoing)", all.filter((p) => !p.flagship && eff(p) === "current")], ["Upcoming", all.filter((p) => !p.flagship && eff(p) === "upcoming")], ["Past", all.filter((p) => !p.flagship && eff(p) === "past")]];
   const del = async (p: WithId<DbProgram>) => { if (!window.confirm(`Delete "${p.title}"? This cannot be undone.`)) return; await remove(ref(database(), `programs/${p.id}`)); if (p.imageId) await remove(ref(database(), `images/${p.imageId}`)).catch(() => {}); };
   if (editing) return <ProgramForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} all={all} onDone={() => setEditing(null)} />;
   return (
@@ -170,7 +172,7 @@ function ProgramsTab() {
           <ul className="divide-y divide-line rounded-xl border border-line">{g.map((p) => (
             <li key={p.id} className="flex flex-wrap items-center gap-4 p-4">
               {p.imageId ? <img src={imageSrc(p.imageId)} alt="" className="size-14 rounded-md object-cover" /> : <div className="size-14 rounded-md border border-dashed border-line-strong" />}
-              <div className="mr-auto min-w-0"><p className="font-semibold">{p.title}{p.flagship && <span className="ml-2 rounded-full border border-brand-text px-2 py-0.5 text-xs text-brand-text">Flagship</span>}</p><p className="truncate text-sm text-muted">{STATUS_LABEL[p.status]}{p.startDate ? ` · ${p.startDate}` : ""}</p></div>
+              <div className="mr-auto min-w-0"><p className="font-semibold">{p.title}{p.flagship && <span className="ml-2 rounded-full border border-brand-text px-2 py-0.5 text-xs text-brand-text">Flagship</span>}</p><p className="truncate text-sm text-muted">{STATUS_LABEL[eff(p)]}{programTiming(p).auto ? " (from dates)" : ""}{p.startDate ? ` · ${p.startDate}` : ""}</p></div>
               <button className={btnGhost} onClick={() => setEditing(p)}>Edit</button><button className={btnDanger} onClick={() => void del(p)}>Delete</button>
             </li>))}</ul></section>))}
     </div>
@@ -633,6 +635,54 @@ function JourneyForm({ initial, all, onDone }: { initial?: WithId<DbJourney>; al
 const JourneysTab = () => <ManagedTab<DbJourney> path="journeys" intro="Before-and-after learner stories for “Progress you can see” on the TEP page. Hidden until one is published."  addLabel="Add journey" emptyText="No journeys yet."
   label={(j) => j.who || j.after} sub={(j) => `${j.before} → ${j.after}`} Form={(p) => <JourneyForm key={p.initial?.id ?? "new"} {...p} />} />;
 
+/* ---------- TEP page switches ---------- */
+const TEP_SECTIONS: { key: TepSectionKey; label: string; heading: string; tab: string }[] = [
+  { key: "capstones", label: "Capstones", heading: "What you’ll build matters more than what you watch.", tab: "Projects (type Capstone)" },
+  { key: "mentors", label: "Mentors", heading: "Meet the mentors.", tab: "Mentors" },
+  { key: "voices", label: "Learner testimonials on the TEP page", heading: "Don’t just take our word for it.", tab: "Testimonials (Shown on: TEP page)" },
+  { key: "programVoices", label: "Learner testimonials on the Program page", heading: "Don’t just take our word for it.", tab: "Testimonials (Shown on: TEP page)" },
+  { key: "career", label: "Career progress", heading: "Career progress & opportunities.", tab: "Achievements" },
+  { key: "learnerProjects", label: "Learner projects", heading: "Built by our learners.", tab: "Projects (type Learner project)" },
+  { key: "progress", label: "Learner journeys", heading: "Progress you can see.", tab: "Journeys" },
+];
+function TepPageTab() {
+  const [on, setOn] = useState<DbTepSections | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => onValue(ref(database(), "settings/tep"), (s) => { setOn((s.val() ?? {}) as DbTepSections); setError(""); }, (e) => setError(errText(e))), []);
+  const projects = useList<DbProject>("projects", true).rows, mentors = useList<DbMentor>("mentors", true).rows, voices = useList<DbTestimonial>("testimonials", true).rows,
+    ach = useList<DbAchievement>("achievements", true).rows, journeys = useList<DbJourney>("journeys", true).rows;
+  const count = (k: TepSectionKey) => {
+    const pub = <T extends { published: boolean }>(r: WithId<T>[] | null, f: (x: WithId<T>) => boolean = () => true) => (r ?? []).filter((x) => x.published && f(x)).length;
+    return k === "capstones" ? pub(projects, (p) => p.kind === "capstone") : k === "learnerProjects" ? pub(projects, (p) => p.kind === "learner") : k === "mentors" ? pub(mentors)
+      : (k === "voices" || k === "programVoices") ? pub(voices, (t) => t.kind === "learner") : k === "career" ? pub(ach) : pub(journeys);
+  };
+  const flip = async (k: TepSectionKey, v: boolean) => { try { await set(ref(database(), `settings/tep/${k}`), v); } catch (e) { setError(errText(e)); } };
+  return (
+    <div className="max-w-3xl space-y-6">
+      <p className="text-muted">Choose which optional sections appear on the TEP page. Each one is off until you switch it on, and a section also needs at least one published entry before visitors see it. The page can take up to a minute to update.</p>
+      {error && <p role="alert" className="text-error">{error}</p>}
+      {on === null && !error && <p className="text-muted">Loading…</p>}
+      {on && (
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {TEP_SECTIONS.map((s) => {
+            const checked = on[s.key] === true, n = count(s.key);
+            return (
+              <li key={s.key} className="flex flex-wrap items-center gap-4 p-4">
+                <div className="mr-auto min-w-0">
+                  <p className="font-semibold">{s.label}<span className={`ml-2 rounded-full border px-2 py-0.5 text-xs ${checked ? "border-brand-text text-brand-text" : "border-line-strong text-muted"}`}>{checked ? "On" : "Off"}</span></p>
+                  <p className="text-sm text-muted">“{s.heading}”</p>
+                  <p className="text-sm text-muted">{n} published {n === 1 ? "entry" : "entries"} in {s.tab}{checked && n === 0 ? ". Nothing shows on the live site until you publish one." : "."}</p>
+                </div>
+                <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" role="switch" className="size-5 accent-[var(--brand)]" checked={checked} onChange={(e) => void flip(s.key, e.target.checked)} />Show on the TEP page</label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /* ---------- setup ---------- */
 function SetupTab({ user }: { user: User }) {
   const [msg, setMsg] = useState(""); const [busy, setBusy] = useState(false);
@@ -673,7 +723,7 @@ function SetupTab({ user }: { user: User }) {
 }
 
 /* ---------- shell ---------- */
-const TABS = ["Programs", "Team", "Blog", "Careers", "Testimonials", "Mentors", "Achievements", "Projects", "Journeys", "Setup"] as const;
+const TABS = ["Programs", "Team", "Blog", "Careers", "Testimonials", "Mentors", "Achievements", "Projects", "Journeys", "TEP page", "Setup"] as const;
 type Tab = (typeof TABS)[number];
 
 export function DashboardApp() {
@@ -715,7 +765,7 @@ export function DashboardApp() {
         </div></nav>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8" role="tabpanel" aria-label={tab}>
-        {tab === "Programs" && <ProgramsTab />}{tab === "Team" && <TeamTab />}{tab === "Blog" && <BlogTab />}{tab === "Careers" && <CareersTab />}{tab === "Testimonials" && <TestimonialsTab />}{tab === "Mentors" && <MentorsTab />}{tab === "Achievements" && <AchievementsTab />}{tab === "Journeys" && <JourneysTab />}{tab === "Projects" && <ProjectsTab />}{tab === "Setup" && <SetupTab user={user} />}
+        {tab === "Programs" && <ProgramsTab />}{tab === "Team" && <TeamTab />}{tab === "Blog" && <BlogTab />}{tab === "Careers" && <CareersTab />}{tab === "Testimonials" && <TestimonialsTab />}{tab === "Mentors" && <MentorsTab />}{tab === "Achievements" && <AchievementsTab />}{tab === "Journeys" && <JourneysTab />}{tab === "TEP page" && <TepPageTab />}{tab === "Projects" && <ProjectsTab />}{tab === "Setup" && <SetupTab user={user} />}
       </main>
     </div>
   );
