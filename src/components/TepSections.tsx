@@ -119,7 +119,7 @@ export function TepMentors({ id, items }: { id: string; items: WithId<DbMentor>[
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{m.name}</h3>
-                  <p className="text-sm text-muted">{m.title}</p>
+                  <p className="text-sm text-muted">{m.title}{m.company && <> · {m.company}</>}</p>
                   {m.expertise && m.expertise.length > 0 && <ul aria-label="Expertise" className="mt-3 flex flex-wrap gap-2">{m.expertise.map((x) => <li key={x} className="rounded-full border border-line-strong px-3 py-0.5 text-sm">{x}</li>)}</ul>}
                   {m.guides && m.guides.length > 0 && <p className="mt-3 text-[15px]"><span className="font-semibold">Guides. </span><span className="text-muted">{m.guides.join(", ")}</span></p>}
                   {m.linkedin && <a href={m.linkedin} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-brand-text underline underline-offset-4">LinkedIn<span className="sr-only"> profile of {m.name} (opens in a new tab)</span></a>}

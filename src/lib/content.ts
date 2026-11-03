@@ -1,5 +1,5 @@
 import { DB_URL } from "./firebase-config";
-import type { DbAchievement, DbJourney, DbMentor, DbOpening, DbProject, DbTestimonial, DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
+import type { DbCommunityPhoto, DbAchievement, DbJourney, DbMentor, DbOpening, DbProject, DbTestimonial, DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
 import type { Member } from "@/content/team";
 
 /** Public reads from the Realtime Database REST API. Any failure returns null so pages fall back to built-in content. */
@@ -46,6 +46,11 @@ export async function getAchievements(): Promise<WithId<DbAchievement>[]> {
 }
 export async function getProjects(kind: DbProject["kind"]): Promise<WithId<DbProject>[]> {
   return list(await read<Record<string, DbProject>>("projects")).filter((p) => p.title && p.description && p.published && p.kind === kind).sort(byOrder);
+}
+
+/** Community gallery photos from the dashboard. Hidden ones are not returned. */
+export async function getCommunityPhotos(): Promise<WithId<DbCommunityPhoto>[]> {
+  return list(await read<Record<string, DbCommunityPhoto>>("community")).filter((p) => p.label && p.alt && p.imageId && p.published).sort(byOrder);
 }
 
 export async function getMentors(): Promise<WithId<DbMentor>[]> {

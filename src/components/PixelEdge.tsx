@@ -20,7 +20,7 @@ export function PixelEdge({ from, to, className = "" }: { from: string; to: stri
     <InView threshold={0.7} className={`relative z-[2] ${className}`}>
       <svg aria-hidden focusable="false" data-edge viewBox={`0 0 ${COLS * SIZE} ${H}`} preserveAspectRatio="xMidYMax slice"
            className="block h-8 w-full sm:h-12" style={{ background: from, marginTop: -2, marginBottom: -2 }}>
-        <rect x="0" y={H - 4} width={COLS * SIZE} height="4" style={{ fill: to }} />
+        <rect x="0" y={H - 4} width={COLS * SIZE} height="4" shapeRendering="crispEdges" style={{ fill: to }} />
         <path className="px" d={PATH} shapeRendering="crispEdges" style={{ fill: to }} />
       </svg>
     </InView>

@@ -2,7 +2,8 @@ import { ButtonLink, PageHero, Section, SectionHeader } from "@/components/ui";
 import { PixelEdge } from "@/components/PixelEdge";
 import { TeamCarousel } from "@/components/TeamCarousel";
 import { CultureGallery } from "@/components/CultureGallery";
-import { CommunitySection } from "@/components/CommunitySection";
+import { CommunityIntro, CommunityMore } from "@/components/CommunitySection";
+import { CommunityGallery, getGalleryItems } from "@/components/CommunityGallery";
 import { ENGAGEMENT_STEPS } from "@/content/services";
 import { PRINCIPLES } from "@/content/team";
 import { SITE } from "@/content/site";
@@ -12,7 +13,7 @@ import { getTeam } from "@/lib/content";
 export const metadata = pageMeta("Company", "DeboisTech IT Solutions LLP is a technology company in Nashik, India, building software, AI and cloud systems, products and training programs.", "/company");
 
 export default async function CompanyPage() {
-  const team = await getTeam();
+  const [team, gallery] = await Promise.all([getTeam(), getGalleryItems()]);
   return (
     <>
       <PageHero eyebrow="Company" title="Engineering modern solutions, AI and cloud platforms" lead={`${SITE.legalName} is based in ${SITE.location}. We serve clients across India and internationally, remotely and through online delivery.`} />
@@ -40,9 +41,25 @@ export default async function CompanyPage() {
       </Section>
       <PixelEdge from="var(--paper)" to="#ffffff" />
       <Section theme="white" labelledBy="community">
-        <CommunitySection headingId="community" />
-        <div className="mt-10 flex flex-wrap gap-3"><ButtonLink href="/careers" variant="secondary">Careers</ButtonLink></div>
+        <CommunityIntro headingId="community" />
+        {gallery.length === 0 && (
+          <div className="mt-16 sm:mt-24">
+            <CommunityMore><ButtonLink href="/careers" variant="secondary">Careers</ButtonLink></CommunityMore>
+          </div>
+        )}
       </Section>
+      {gallery.length > 0 && (
+        <>
+          {/* photos and stories share one dark section, so the page has a single break instead of two */}
+          <PixelEdge from="#ffffff" to="var(--paper)" />
+          <Section id="gallery" labelledBy="gallery-h">
+            <SectionHeader id="gallery-h" title="People. Ideas. Experiences." lead="A glimpse into the communities, conversations and experiences we’re proud to be part of." />
+            <CommunityGallery items={gallery} />
+            <div className="mt-16 sm:mt-24"><CommunityMore><ButtonLink href="/careers" variant="secondary">Careers</ButtonLink></CommunityMore></div>
+          </Section>
+          <PixelEdge from="var(--paper)" to="#ffffff" />
+        </>
+      )}
     </>
   );
 }

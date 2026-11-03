@@ -79,10 +79,10 @@ export const IMPACT_METRICS: { label: string; value?: string; note?: string }[] 
  * Shown under the impact strip. Keep each entry to a relationship you can document, and use the programme's exact name.
  * No Google or CNCF logos are used: only their names, as plain text.
  */
-export type Partner = { name: string; role: string; /** Optional logo in public/partners/. Without one, the name is shown as a text wordmark. */ logo?: { src: string; alt: string; width: number; height: number } };
+export type Partner = { name: string; role: string; /** A public page that shows the relationship, shown as a link on the tile. */ proof?: { href: string; label: string }; /** Optional logo in public/partners/. Without one, the name is shown as a text wordmark. */ logo?: { src: string; alt: string; width: number; height: number } };
 export const PARTNERS: Partner[] = [
-  { name: "Google Cloud", role: "Official Google partner", logo: { src: "/partners/google-cloud.png", alt: "Google Cloud", width: 900, height: 197 } }, /* role is the owner's statement; confirm the exact programme name before publishing */
-  { name: "Google Developer Groups Nashik", role: "Community partner", logo: { src: "/partners/gdg-nashik.png", alt: "Google Developer Groups Nashik", width: 900, height: 323 } },
+  { name: "Google Cloud", role: "Listed on Google Cloud Partner Finder", proof: { href: "https://cloud.google.com/find-a-partner/partner/deboistech", label: "View our Partner Finder profile" }, logo: { src: "/partners/google-cloud.png", alt: "Google Cloud", width: 900, height: 197 } }, /* wording follows the listing itself: its Tiers field reads "No tiers yet" (checked 3 Nov 2026), so do not call this a tiered or "official" partnership unless Google assigns one */
+  { name: "Google Developer Groups Nashik", role: "Community partner", proof: { href: "https://gdgnashik.com/#partners", label: "See us on the GDG Nashik partners list" }, logo: { src: "/partners/gdg-nashik.png", alt: "Google Developer Groups Nashik", width: 900, height: 323 } },
   { name: "CNCG Nashik", role: "Part of the Cloud Native & AI community", logo: { src: "/partners/cncg-nashik.png", alt: "Cloud Native Community Groups Nashik", width: 600, height: 520 } },
 ];
 
