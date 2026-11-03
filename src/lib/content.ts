@@ -1,5 +1,5 @@
 import { DB_URL } from "./firebase-config";
-import type { DbCommunityPhoto, DbAchievement, DbJourney, DbMentor, DbOpening, DbProject, DbTestimonial, DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
+import type { DbCommunityPhoto, DbTepSections, DbAchievement, DbJourney, DbMentor, DbOpening, DbProject, DbTestimonial, DbPost, DbProgram, DbTeam, WithId } from "@/content/dynamic";
 import type { Member } from "@/content/team";
 
 /** Public reads from the Realtime Database REST API. Any failure returns null so pages fall back to built-in content. */
@@ -69,4 +69,9 @@ export async function getMentors(): Promise<WithId<DbMentor>[]> {
 }
 export async function getJourneys(): Promise<WithId<DbJourney>[]> {
   return list(await read<Record<string, DbJourney>>("journeys")).filter((j) => j.before && j.after && j.published).sort(byOrder);
+}
+
+/** Which optional TEP sections are switched on from the dashboard. Everything defaults to off. */
+export async function getTepSections(): Promise<DbTepSections> {
+  return (await read<DbTepSections>("settings/tep")) ?? {};
 }

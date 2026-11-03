@@ -264,7 +264,7 @@ test("navbar: Program replaces Academy / TEP, Debo Labs is gone, and the CTA is 
   await expect(nav.getByRole("link", { name: "Program" })).toHaveAttribute("aria-current", "page"); // TEP pages live under Program
   await page.goto("/program");
   await expect(page.getByRole("heading", { level: 3, name: "Technology Excellence Program" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "See the program" })).toHaveAttribute("href", "/tep");
+  await expect(page.getByRole("link", { name: "See the curriculum" })).toHaveAttribute("href", "/tep");
 });
 
 test("team shows every member with a portrait; LinkedIn links are real, never empty", async ({ page }) => {

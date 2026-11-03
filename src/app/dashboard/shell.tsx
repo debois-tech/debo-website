@@ -91,6 +91,7 @@ export type SectionMeta = { id: string; label: string; group: string; blurb: str
 export const OVERVIEW: SectionMeta = { id: "overview", label: "Overview", group: "", blurb: "What is on the website, and where to add more." };
 export const SECTIONS: SectionMeta[] = [
   { id: "programs", label: "Programs", group: "Website", blurb: "Programs shown on the Program page: running, upcoming and past.", page: { href: "/program", label: "Program page" }, path: "programs" },
+  { id: "tep", label: "TEP page", group: "Website", blurb: "Choose which optional sections of the TEP page are shown. Each stays off until you switch it on.", page: { href: "/tep", label: "TEP page" } },
   { id: "team", label: "Team", group: "Website", blurb: "People shown on the home page and the Company page.", page: { href: "/company", label: "Company page" }, path: "team" },
   { id: "blog", label: "Blog", group: "Website", blurb: "Posts and drafts for the Blog.", page: { href: "/blog", label: "Blog" }, path: "posts" },
   { id: "careers", label: "Careers", group: "Website", blurb: "Open roles. With none open, the page says so.", page: { href: "/careers", label: "Careers page" }, path: "openings" },

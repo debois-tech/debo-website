@@ -7,7 +7,7 @@ import { SERVICES } from "@/content/services";
 import { TRACKS } from "@/content/tep";
 import { handleInput, initialState } from "./flows";
 
-const program = { id: "p1", title: "Forward Deployed Engineering", status: "upcoming" as const, summary: "FDE", startDate: "1 Nov 2026" };
+const program = { id: "p1", title: "Forward Deployed Engineering", status: "upcoming" as const, summary: "FDE", startDate: "1 Nov 2099" }; // far in the future so the test does not depend on today's date
 
 describe("knowledge is derived from the site content", () => {
   it("has a chunk for every service, product, lab track and TEP track", () => {
@@ -35,9 +35,16 @@ describe("dashboard data", () => {
     expect(programsText(null)).not.toMatch(/starts/);
     const t = programsText([program]);
     expect(t).toContain("Forward Deployed Engineering (upcoming)");
-    expect(t).toContain("starts 1 Nov 2026");
+    expect(t).toContain("starts 1 Nov 2099");
     expect(t).not.toMatch(/\bfee \S/);
     expect(programsText([{ ...program, fee: "₹10,000" }])).toContain("fee ₹10,000");
+  });
+  it("works out running / upcoming / past from the dates, not the manual status", () => {
+    const past = { ...program, status: "upcoming" as const, startDate: "1 Jan 2020", endDate: "1 Feb 2020" };
+    const running = { ...program, status: "upcoming" as const, startDate: "1 Jan 2020", endDate: "1 Jan 2099" };
+    expect(programsText([past])).toContain("Forward Deployed Engineering (past)");
+    expect(programsText([running])).toContain("Forward Deployed Engineering (current)");
+    expect(programsText([program])).toContain("Forward Deployed Engineering (upcoming)");
   });
   it("turns blog posts into linkable chunks", () => {
     const [c] = postChunks([{ id: "x", title: "Shipping Kubernetes", slug: "shipping-k8s", excerpt: "Notes.", body: "", author: "Yash" }]);
@@ -46,7 +53,7 @@ describe("dashboard data", () => {
   });
   it("the Programs button uses dashboard text when available", () => {
     const r = handleInput(initialState(), { text: "Programs", value: "cmd:programs" }, { programs: programsText([program]) });
-    expect(r.messages[0].text).toContain("starts 1 Nov 2026");
-    expect(handleInput(initialState(), { text: "Programs", value: "cmd:programs" }).messages[0].text).not.toContain("1 Nov 2026");
+    expect(r.messages[0].text).toContain("starts 1 Nov 2099");
+    expect(handleInput(initialState(), { text: "Programs", value: "cmd:programs" }).messages[0].text).not.toContain("1 Nov 2099");
   });
 });

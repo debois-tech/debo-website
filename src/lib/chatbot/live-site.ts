@@ -8,6 +8,7 @@ import { COMMUNITIES, COMMUNITY_INTRO } from "@/content/community";
 import { PRINCIPLES, TEAM } from "@/content/team";
 import { STORIES } from "@/content/work";
 import type { DbPost, DbProgram, WithId } from "@/content/dynamic";
+import { programTiming } from "@/lib/program-status";
 
 export type Chunk = { id: string; title: string; text: string; href?: string };
 
@@ -27,7 +28,7 @@ const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
 export function programsText(db: WithId<DbProgram>[] | null): string {
   const live = (db ?? []).map((p) => {
     const facts = [p.startDate && `starts ${p.startDate}`, p.endDate && `ends ${p.endDate}`, p.duration && `duration ${p.duration}`, p.fee && `fee ${p.fee}`].filter(Boolean);
-    return `${p.title} (${p.status})${p.summary ? `: ${sentence(p.summary)}` : "."}${facts.length ? ` Published details: ${facts.join(", ")}.` : ""}`;
+    return `${p.title} (${programTiming(p).status})${p.summary ? `: ${sentence(p.summary)}` : "."}${facts.length ? ` Published details: ${facts.join(", ")}.` : ""}`;
   });
   return [
     `${TEP_INTRO} Tracks: ${join(TRACKS.map((t) => t.name))}.`,
