@@ -11,6 +11,7 @@ import { offlineReply } from "@/lib/chatbot/offline";
 type Msg = BotMessage & { id: string; role: "bot" | "user"; at: number };
 type Saved = { id: string; savedAt: number; messages: Msg[]; state: FlowState };
 
+// sessionStorage, not localStorage: the saved chat can hold the visitor's name, email and phone, which must not outlive the tab on a shared computer.
 const KEY = "debo-chat-v1";
 const TTL = 24 * 60 * 60 * 1000;
 const LOGO = "/brand/debo-assistant.png";
@@ -22,13 +23,13 @@ const fmt = (t: number) => new Date(t).toLocaleString("en-US", { month: "short",
 
 function load(): Saved | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = sessionStorage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as Saved;
     return Date.now() - s.savedAt < TTL && Array.isArray(s.messages) && s.state ? s : null;
   } catch { return null; }
 }
-function save(s: Saved) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage unavailable */ } }
+function save(s: Saved) { try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage unavailable */ } }
 
 const LINK_RE = /\[([^\]]+)\]\(([^)\s]+)\)/g;
 const BULLET_RE = /^\s*[-•*]\s+/;

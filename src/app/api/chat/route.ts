@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp, sameOrigin } from "@/lib/request";
 import { systemPrompt } from "@/lib/chatbot/prompt";
 import { getKnowledge } from "@/lib/chatbot/site-data";
 import type { Chunk } from "@/lib/chatbot/live-site";
@@ -50,8 +51,8 @@ async function callGemini(contents: Content[], key: string, model: string, syste
   return (await res.json()) as { candidates?: { content?: Content }[] };
 }
 
-async function runModel(contents: Content[], key: string, model: string, chunks: Chunk[]) {
-  const ctx: ToolContext = { actions: [], submitted: false, chunks };
+async function runModel(contents: Content[], key: string, model: string, chunks: Chunk[], ip: string) {
+  const ctx: ToolContext = { actions: [], submitted: false, chunks, ip };
   const system = systemPrompt(chunks);
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     const data = await callGemini(contents, key, model, system);
@@ -75,12 +76,15 @@ async function runModel(contents: Content[], key: string, model: string, chunks:
 }
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  if (origin && new URL(origin).host !== req.headers.get("host")) return json({ ok: false, code: "forbidden" }, 403);
+  if (!sameOrigin(req)) return json({ ok: false, code: "forbidden" }, 403);
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIp(req);
   if (!rateLimit(`chat:${ip}`, 30)) return json({ ok: false, code: "rate_limited" }, 429, { "Retry-After": "600" });
 
+  // A site-wide ceiling as well, so many addresses together cannot run up the model bill (per instance; use a shared store for a strict cap).
+  if (!rateLimit("chat:all", 600)) return json({ ok: false, code: "rate_limited" }, 429, { "Retry-After": "600" });
+
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY) return json({ ok: false, code: "too_large" }, 413); // refuse before reading a huge body
   const body = await req.text();
   if (body.length > MAX_BODY) return json({ ok: false, code: "too_large" }, 413);
   let raw: { messages?: unknown };
@@ -93,7 +97,7 @@ export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (key) {
     try {
-      const { text, ctx } = await runModel(contents, key, process.env.CHATBOT_MODEL || "gemini-3.5-flash", chunks);
+      const { text, ctx } = await runModel(contents, key, process.env.CHATBOT_MODEL || "gemini-3.5-flash", chunks, ip);
       const action: ChatAction | undefined = ctx.actions[ctx.actions.length - 1];
       return json({ ok: true, text: clip(text, 4000), action, submitted: ctx.submitted });
     } catch (err) {

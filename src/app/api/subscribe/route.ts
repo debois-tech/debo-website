@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp, sameOrigin } from "@/lib/request";
 import { SITE } from "@/content/site";
 
 export const runtime = "nodejs";
@@ -13,10 +14,9 @@ const json = (body: Record<string, unknown>, status: number, headers?: Record<st
  * Without it, the signup is emailed to ENQUIRY_TO_EMAIL so nobody is lost. Same guards as /api/enquiry.
  */
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  if (origin && new URL(origin).host !== req.headers.get("host")) return json({ ok: false, code: "forbidden" }, 403);
+  if (!sameOrigin(req)) return json({ ok: false, code: "forbidden" }, 403);
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIp(req);
   if (!rateLimit(`sub:${ip}`, 5, 10 * 60_000)) return json({ ok: false, code: "rate_limited" }, 429, { "Retry-After": "600" });
   if (Number(req.headers.get("content-length") ?? 0) > 2_000) return json({ ok: false, code: "too_large" }, 413);
 

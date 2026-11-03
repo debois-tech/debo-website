@@ -3,6 +3,7 @@ import { search } from "./knowledge";
 import { ROUTES, type Chunk } from "./live-site";
 import { SITE } from "@/content/site";
 import { submitEnquiry } from "@/lib/enquiries/submit";
+import { rateLimit } from "@/lib/ratelimit";
 
 export type ChatAction = { label: string; href: string };
 
@@ -38,7 +39,7 @@ export const TOOL_DECLARATIONS = [
   },
 ];
 
-export type ToolContext = { actions: ChatAction[]; submitted: boolean; chunks: Chunk[] };
+export type ToolContext = { actions: ChatAction[]; submitted: boolean; chunks: Chunk[]; /** visitor IP, for the enquiry rate limit */ ip: string };
 
 /** Results are plain data returned to the model; they are never executed or trusted as instructions. */
 export async function runTool(name: string, args: Record<string, unknown>, ctx: ToolContext): Promise<Record<string, unknown>> {
@@ -57,6 +58,9 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
       return { ok: true, route };
     }
     case "capture_project_enquiry": {
+      // A visitor can try to talk the model into submitting many enquiries. One per reply, and the same per-IP budget as the form endpoint.
+      if (ctx.submitted) return { ok: false, error: "An enquiry was already submitted in this reply." };
+      if (!rateLimit(`enquiry:${ctx.ip}`, 5)) return { ok: false, error: `Too many enquiries from this connection. Ask the visitor to email ${SITE.email}.` };
       const result = await submitEnquiry({ ...args, source: "chatbot-llm" });
       if (result.ok) { ctx.submitted = true; return { ok: true }; }
       return { ok: false, error: result.code === "invalid" ? `Missing or invalid fields: ${Object.keys(result.errors ?? {}).join(", ")}` : `Submission failed. Ask the visitor to email ${SITE.email}.` };
