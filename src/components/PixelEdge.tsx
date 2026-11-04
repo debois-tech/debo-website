@@ -19,8 +19,11 @@ export function PixelEdge({ from, to, className = "" }: { from: string; to: stri
   return (
     <InView threshold={0.7} className={`relative z-[2] ${className}`}>
       <svg aria-hidden focusable="false" data-edge viewBox={`0 0 ${COLS * SIZE} ${H}`} preserveAspectRatio="xMidYMax slice"
-           className="block h-8 w-full sm:h-12" style={{ background: from, marginTop: -2, marginBottom: -2 }}>
-        <rect x="0" y={H - 4} width={COLS * SIZE} height="4" shapeRendering="crispEdges" style={{ fill: to }} />
+           className="block h-8 w-full overflow-visible sm:h-12" style={{ background: from, marginTop: -2, marginBottom: -2 }}>
+        {/* The base strip runs 16 units past the bottom of the graphic (overflow-visible) into the next section, which is the same colour.
+            On displays scaled to 125%/150%/175% the last pixel row of the graphic is only partly covered; without this, the page behind it
+            shows through as a thin light line under the steps. */}
+        <rect x="0" y={H - 4} width={COLS * SIZE} height="20" shapeRendering="crispEdges" style={{ fill: to }} />
         <path className="px" d={PATH} shapeRendering="crispEdges" style={{ fill: to }} />
       </svg>
     </InView>
