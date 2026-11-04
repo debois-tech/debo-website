@@ -67,9 +67,9 @@ export const BUILD_WALL: BuildWallProject[] = [];
  * Metrics without a value are hidden on the live site and shown as "add a verified figure" tiles while developing.
  */
 export const IMPACT_METRICS: { label: string; value?: string; note?: string }[] = [
-  { label: "Developers & learners reached" },
-  { label: "Community events supported" },
-  { label: "Hands-on workshops delivered" },
+  { label: "Developers & learners reached", value: "300+" },
+  { label: "Community events supported", value: "10+" },
+  { label: "Hands-on workshops delivered", value: "5+" },
   { label: "Community partnerships", value: "2", note: "GDG Nashik, CNCG Nashik" },
 ];
 

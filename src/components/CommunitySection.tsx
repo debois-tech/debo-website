@@ -17,7 +17,7 @@ export function CommunityIntro({ headingId = "community" }: { headingId?: string
       {/* impact strip: verified figures only */}
       {IMPACT_METRICS.some((m) => m.value) || SHOW_PLACEHOLDERS ? (
         <InView>
-          <dl aria-label="Community impact" className="reveal grid grid-cols-2 gap-x-6 gap-y-8 border-y border-line py-8 lg:grid-cols-4">
+          <dl aria-label="Community impact" className={`reveal grid grid-cols-2 gap-x-6 gap-y-8 border-y border-line py-8 ${({ 1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3" } as Record<number, string>)[metrics.length] ?? "lg:grid-cols-4"}`}>
             {metrics.map((m) => (
               <div key={m.label} className="flex flex-col">
                 <dt className="order-2 mt-1 text-muted">{m.label}</dt>
