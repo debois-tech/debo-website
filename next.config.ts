@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
+// /verify shows badge images served by the LMS. Assumes they live on the same host as the verify API; if not, add that host here.
+const verifyOrigin = (() => { try { return new URL(process.env.VERIFY_URL ?? "").origin; } catch { return ""; } })();
 
 /**
  * Content-Security-Policy. The site loads nothing from third parties: fonts are self-hosted, there are no iframes or ad/analytics scripts.
@@ -12,7 +14,7 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob:${verifyOrigin ? ` ${verifyOrigin}` : ""}`,
   "font-src 'self' data:",
   `connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
   "worker-src 'self' blob:",

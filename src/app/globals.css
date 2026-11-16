@@ -208,6 +208,7 @@ body {
   --ink: #0a0a0a; --ink-muted: #525252; --line: #d4d4d4; --line-strong: #8c8c8c;
   --brand: #1f7a3a; --brand-text: #1f7a3a; --brand-logo: #1f7a3a;
   --wash: #f5f5f5; --paper: #ffffff; --forest: #0a0a0a; --forest-2: #f5f5f5; --forest-3: #ebebeb; --mint: #f5f5f5;
+  --error: #b42318; --error-bg: #fdecea; /* the dark values (#ff8a80 on #2a1210) fail contrast and read wrong on white */
   background: #ffffff; color: #0a0a0a;
 }
 
@@ -305,6 +306,11 @@ main section { content-visibility: auto; contain-intrinsic-size: auto 900px; }
   --wash: #141414; --paper: #0a0a0a; --forest: #000000; --forest-2: #141414; --forest-3: #1f1f1f; --mint: #141414;
   background: #0a0a0a; color: #fafafa;
 }
+
+/* /verify success mark: the pixel check draws square by square along its stroke (feedback on a result). Transform + opacity only; units are the SVG's 10x7 grid. */
+@keyframes check-px { from { opacity: 0; transform: translateY(0.7px); } to { opacity: 1; transform: none; } }
+.check-px { transform-box: fill-box; animation: check-px 0.3s var(--ease) both; animation-delay: calc(var(--i, 0) * 40ms); }
+@media (prefers-reduced-motion: reduce) { .check-px { animation: none; } }
 
 /* Pixel edges overlap the section above AND below by 2px (half-pixel boundaries otherwise let the page background show as a hairline). */
 main > section, main > .hero { position: relative; z-index: 1; }

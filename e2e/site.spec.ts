@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-const ROUTES = ["/", "/products", "/products/tenantplane", "/products/motoadmin", "/services", "/services/ai-ml", "/company", "/work", "/program", "/blog", "/dashboard", "/tep", "/tep/ai-ml", "/tep/multi-cloud", "/labs", "/careers", "/contact", "/privacy", "/terms", "/nope"];
+const ROUTES = ["/", "/products", "/products/tenantplane", "/products/motoadmin", "/services", "/services/ai-ml", "/company", "/work", "/program", "/blog", "/dashboard", "/tep", "/tep/ai-ml", "/tep/multi-cloud", "/labs", "/careers", "/contact", "/verify", "/privacy", "/terms", "/nope"];
 
 for (const r of ROUTES) {
   test(`a11y + no horizontal overflow: ${r}`, async ({ page }) => {
@@ -428,5 +428,66 @@ test.describe("services explorer", () => {
     const before = (await sec.boundingBox())!.height;
     await sec.getByRole("tab").nth(2).click(); await page.waitForTimeout(400);
     expect(Math.abs((await sec.boundingBox())!.height - before)).toBeLessThan(40);          // switching services does not make the page jump
+  });
+});
+
+test.describe("verify", () => {
+  const BADGE_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='112' height='144'%3E%3Crect width='112' height='144' fill='%23333'/%3E%3C/svg%3E";
+  const outcomes: [string, number, object, RegExp][] = [
+    ["valid badge", 200, { kind: "valid", docType: "badge", holderName: "Test Holder", issueDate: "2026-11-01", badgeName: "MCP Voyager", badgeImageUrl: BADGE_IMG }, /Verified/],
+    ["revoked", 200, { kind: "revoked", docType: "badge", holderName: "Test Holder", issueDate: "2026-11-01" }, /no longer valid/],
+    ["unverified", 200, { kind: "unverified" }, /We could not verify this reference/],
+    ["invalid", 422, { kind: "invalid" }, /doesn’t look right/],
+    ["unavailable", 502, { kind: "error" }, /unavailable right now/],
+    ["rate limited", 429, { kind: "rate_limited" }, /Too many attempts/],
+  ];
+  for (const [name, status, body, text] of outcomes) {
+    test(`${name}: renders, keeps the input, axe clean at 320px`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.setViewportSize({ width: 320, height: 800 });
+      await page.route("**/api/verify", (r) => r.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }));
+      await page.goto("/verify");
+      await page.getByLabel("Badge reference number").fill("DBTAML-260020-DAH104");
+      await page.getByRole("button", { name: "Verify" }).click();
+      await expect(page.getByRole("status")).toContainText(text);
+      await expect(page.getByLabel("Badge reference number")).toHaveValue("DBTAML-260020-DAH104");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+      const res = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+      expect(res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`)).toEqual([]);
+    });
+  }
+
+  test("the label follows the document type and changing it clears a stale result", async ({ page }) => {
+    await page.route("**/api/verify", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ kind: "unverified" }) }));
+    await page.goto("/verify");
+    await page.getByLabel("Badge reference number").fill("DBTAML-260020-DAH104");
+    await page.getByRole("button", { name: "Verify" }).click();
+    await expect(page.getByRole("status")).toContainText("We could not verify");
+    await page.getByLabel("Document type").selectOption("offer_letter");
+    await expect(page.getByLabel("Student ID")).toBeVisible();
+    await expect(page.getByRole("status")).toBeEmpty();
+  });
+
+  test("the pixel check marks a verified result only", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    let body: object = { kind: "valid", docType: "certificate", holderName: "Test Holder", issueDate: "2026-11-04" };
+    await page.route("**/api/verify", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }));
+    await page.goto("/verify");
+    await page.getByLabel("Badge reference number").fill("DBTAML-260020-DAH104");
+    await page.getByRole("button", { name: "Verify" }).click();
+    await expect(page.getByRole("status").locator("svg[aria-hidden] rect")).toHaveCount(18);
+    body = { kind: "revoked", docType: "certificate", holderName: "Test Holder", issueDate: "2026-11-04" };
+    await page.getByRole("button", { name: "Verify" }).click();
+    await expect(page.getByRole("status")).toContainText("no longer valid");
+    await expect(page.getByRole("status").locator("svg")).toHaveCount(0);
+  });
+
+  test("an empty submit asks for a reference without calling the API", async ({ page }) => {
+    let calls = 0;
+    await page.route("**/api/verify", (r) => { calls++; return r.abort(); });
+    await page.goto("/verify");
+    await page.getByRole("button", { name: "Verify" }).click();
+    await expect(page.getByRole("status")).toContainText("doesn’t look right");
+    expect(calls).toBe(0);
   });
 });
